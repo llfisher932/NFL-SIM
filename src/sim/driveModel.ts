@@ -2,10 +2,12 @@ import { isBefore } from "../features/window";
 import type { SeasonWeek } from "../types/features";
 import {
   DRIVE_OUTCOMES,
+  EMPTY_STATS,
   type ConversionCount,
   type DriveOutcome,
   type DriveRecord,
   type SimConfig,
+  type TeamGameStats,
 } from "../types/sim";
 import { fitMultinomial, softmaxProbabilities, type MultinomialModel } from "./multinomial";
 import { createNearestSampler, type NearestSampler } from "./nearestSampler";
@@ -16,6 +18,7 @@ export type RatingLookup = (at: SeasonWeek, team: string) => { offense: number; 
 export interface DriveTemplate {
   endYardline: number;
   durationSeconds: number;
+  stats: TeamGameStats;
 }
 
 export interface DriveModel {
@@ -100,7 +103,7 @@ export function fitDriveModel(
     createNearestSampler(
       source.map((d) => ({
         key: d.startYardline,
-        value: { endYardline: d.endYardline, durationSeconds: d.durationSeconds },
+        value: { endYardline: d.endYardline, durationSeconds: d.durationSeconds, stats: d.stats },
       })),
       config.neighbors,
     );
@@ -154,7 +157,11 @@ export function fitDriveModel(
       const sampler = templates[outcome](secondsLeft);
       const maxSeconds = secondsLeft / paceScale;
       if (sampler.size === 0) {
-        const fallback = { endYardline: outcome === "safety" ? 99 : startYardline, durationSeconds: medianDuration };
+        const fallback = {
+          endYardline: outcome === "safety" ? 99 : startYardline,
+          durationSeconds: medianDuration,
+          stats: EMPTY_STATS,
+        };
         return fallback.durationSeconds <= maxSeconds ? fallback : null;
       }
       for (let attempt = 0; attempt < TEMPLATE_ATTEMPTS; attempt++) {

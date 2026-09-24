@@ -53,6 +53,17 @@ export function syntheticDrives(seasons: readonly number[], weeks: number, seed 
           outcome,
           durationSeconds: Math.max(5, Math.min(startSeconds, 60 + Math.floor(random() * 240))),
           nextStartYardline: outcome === "end_of_half" ? null : 60 + Math.floor(random() * 20),
+          stats: {
+            passAttempts: 3,
+            completions: 2,
+            passYards: outcome === "touchdown" ? 45 : 15,
+            passTds: outcome === "touchdown" ? 1 : 0,
+            interceptions: outcome === "turnover" ? 1 : 0,
+            targets: 3,
+            carries: 2,
+            rushYards: 8,
+            rushTds: 0,
+          },
         });
       }
     }

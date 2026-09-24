@@ -5,6 +5,18 @@ import { matchupEpa, simulateGame } from "../../src/sim/game";
 import { createRng } from "../../src/sim/rng";
 import { DRIVE_OUTCOMES, type DriveOutcome, type Matchup } from "../../src/types/sim";
 
+const DRIVE_STATS = {
+  passAttempts: 4,
+  completions: 3,
+  passYards: 30,
+  passTds: 0,
+  interceptions: 0,
+  targets: 4,
+  carries: 2,
+  rushYards: 9,
+  rushTds: 0,
+};
+
 interface StubLog {
   offenseMatchups: number[];
   paceScales: number[];
@@ -24,7 +36,7 @@ function scriptedModel(script: (drive: number) => DriveOutcome, durationSeconds 
     },
     sampleDrive: (_outcome, _start, secondsLeft, paceScale) => {
       log.paceScales.push(paceScale);
-      return durationSeconds * paceScale <= secondsLeft ? { endYardline: 50, durationSeconds } : null;
+      return durationSeconds * paceScale <= secondsLeft ? { endYardline: 50, durationSeconds, stats: DRIVE_STATS } : null;
     },
     sampleNextStart: () => 75,
     sampleKickoffStart: () => 70,
@@ -83,6 +95,24 @@ describe("sim/game", () => {
         const model = scriptedModel((i) => (i === 0 ? "safety" : "punt"));
         const result = simulateGame(model, evenMatchup, config, createRng(1));
         expect(result.homeScore + result.awayScore).toBe(2);
+      });
+    });
+
+    describe("team stats", () => {
+      it("credits each completed drive's box score to the offense", () => {
+        const result = simulateGame(scriptedModel(() => "punt", 150), evenMatchup, config, createRng(1));
+        expect(result.homeStats.passAttempts + result.awayStats.passAttempts).toBe(4 * result.drives);
+        expect(result.homeStats.rushYards + result.awayStats.rushYards).toBe(9 * result.drives);
+      });
+
+      it("credits an end-of-half drive's box score without running more clock", () => {
+        const result = simulateGame(scriptedModel(() => "end_of_half"), evenMatchup, config, createRng(1));
+        expect(result.homeStats.carries + result.awayStats.carries).toBe(2 * result.drives);
+      });
+
+      it("adds nothing when no end-of-half template fits the clock", () => {
+        const result = simulateGame(scriptedModel(() => "end_of_half", 5000), evenMatchup, config, createRng(1));
+        expect(result.homeStats.passAttempts + result.awayStats.passAttempts).toBe(0);
       });
     });
 

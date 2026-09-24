@@ -1,5 +1,33 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
-import type { ConversionCount, DriveOutcome, DriveRecord, Half, WeekGame } from "../types/sim";
+import type { ConversionCount, DriveOutcome, DriveRecord, Half, TeamGameStats, WeekGame } from "../types/sim";
+
+const SCRIMMAGE = "coalesce(two_point_attempt, 0) = 0";
+
+// Matches nflverse player-stat definitions: attempts exclude sacks, carries include scrambles and kneels.
+const DRIVE_STAT_COLUMNS = `
+  count(*) FILTER (pass_attempt = 1 AND sack = 0 AND play_type IN ('pass', 'qb_spike') AND ${SCRIMMAGE})::INTEGER AS pass_attempts,
+  count(*) FILTER (complete_pass = 1 AND play_type = 'pass' AND ${SCRIMMAGE})::INTEGER AS completions,
+  coalesce(sum(passing_yards) FILTER (play_type = 'pass' AND ${SCRIMMAGE}), 0)::INTEGER AS pass_yards,
+  coalesce(sum(pass_touchdown) FILTER (play_type = 'pass' AND ${SCRIMMAGE}), 0)::INTEGER AS pass_tds,
+  coalesce(sum(interception) FILTER (play_type = 'pass'), 0)::INTEGER AS interceptions,
+  count(*) FILTER (receiver_player_id IS NOT NULL AND play_type = 'pass' AND sack = 0 AND ${SCRIMMAGE})::INTEGER AS targets,
+  count(*) FILTER (rush_attempt = 1 AND play_type IN ('run', 'qb_kneel') AND ${SCRIMMAGE})::INTEGER AS carries,
+  coalesce(sum(rushing_yards) FILTER (play_type IN ('run', 'qb_kneel') AND ${SCRIMMAGE}), 0)::INTEGER AS rush_yards,
+  coalesce(sum(rush_touchdown) FILTER (play_type = 'run' AND ${SCRIMMAGE}), 0)::INTEGER AS rush_tds`;
+
+function driveStats(row: Record<string, unknown>): TeamGameStats {
+  return {
+    passAttempts: Number(row["pass_attempts"]),
+    completions: Number(row["completions"]),
+    passYards: Number(row["pass_yards"]),
+    passTds: Number(row["pass_tds"]),
+    interceptions: Number(row["interceptions"]),
+    targets: Number(row["targets"]),
+    carries: Number(row["carries"]),
+    rushYards: Number(row["rush_yards"]),
+    rushTds: Number(row["rush_tds"]),
+  };
+}
 
 const OUTCOME_BY_RESULT: Record<string, DriveOutcome> = {
   Touchdown: "touchdown",
@@ -27,7 +55,8 @@ export async function loadDrives(connection: DuckDBConnection): Promise<DriveRec
          arg_min(yardline_100, play_id) FILTER (down IS NOT NULL) AS start_yardline,
          arg_max(yardline_100, play_id) FILTER (down IS NOT NULL) AS end_yardline,
          max(half_seconds_remaining) AS start_seconds,
-         any_value(fixed_drive_result) AS result
+         any_value(fixed_drive_result) AS result,
+         ${DRIVE_STAT_COLUMNS}
        FROM pbp
        WHERE fixed_drive IS NOT NULL AND posteam IS NOT NULL
        GROUP BY game_id, fixed_drive
@@ -41,7 +70,8 @@ export async function loadDrives(connection: DuckDBConnection): Promise<DriveRec
      )
      SELECT game_id, season, week, game_half, offense, defense, start_yardline, end_yardline,
        start_seconds, start_seconds - coalesce(next_start_seconds, 0) AS duration_seconds,
-       result, next_start_yardline
+       result, next_start_yardline,
+       pass_attempts, completions, pass_yards, pass_tds, interceptions, targets, carries, rush_yards, rush_tds
      FROM sequenced
      WHERE game_half IN ('Half1', 'Half2') AND offense IS NOT NULL AND result IS NOT NULL
        AND start_yardline IS NOT NULL AND end_yardline IS NOT NULL
@@ -65,6 +95,7 @@ export async function loadDrives(connection: DuckDBConnection): Promise<DriveRec
         outcome,
         durationSeconds: Math.max(0, Number(row["duration_seconds"])),
         nextStartYardline: next === null ? null : Number(next),
+        stats: driveStats(row),
       },
     ];
   });

@@ -1,4 +1,11 @@
-import { DRIVE_OUTCOMES, type GameResult, type Matchup, type SimConfig } from "../types/sim";
+import {
+  DRIVE_OUTCOMES,
+  EMPTY_STATS,
+  type GameResult,
+  type Matchup,
+  type SimConfig,
+  type TeamGameStats,
+} from "../types/sim";
 import { HALF_SECONDS } from "./config";
 import type { DriveModel } from "./driveModel";
 import { sampleIndex, type Rng } from "./rng";
@@ -11,7 +18,22 @@ const MAX_POSTSEASON_OVERTIMES = 10;
 
 interface GameState {
   score: Record<Side, number>;
+  stats: Record<Side, TeamGameStats>;
   drives: number;
+}
+
+function addStats(total: TeamGameStats, drive: TeamGameStats): TeamGameStats {
+  return {
+    passAttempts: total.passAttempts + drive.passAttempts,
+    completions: total.completions + drive.completions,
+    passYards: total.passYards + drive.passYards,
+    passTds: total.passTds + drive.passTds,
+    interceptions: total.interceptions + drive.interceptions,
+    targets: total.targets + drive.targets,
+    carries: total.carries + drive.carries,
+    rushYards: total.rushYards + drive.rushYards,
+    rushTds: total.rushTds + drive.rushTds,
+  };
 }
 
 interface PeriodRules {
@@ -50,11 +72,15 @@ function playPeriod(
     const defense = other(offense);
     const probabilities = model.outcomeProbabilities(start, matchupEpa(matchup, offense, config.homeFieldEpa), clock);
     const outcome = DRIVE_OUTCOMES[sampleIndex(probabilities, rng)]!;
-    if (outcome === "end_of_half") return;
-
     const drive = model.sampleDrive(outcome, start, clock, paceScale[offense], rng);
+    if (outcome === "end_of_half") {
+      if (drive) state.stats[offense] = addStats(state.stats[offense], drive.stats);
+      return;
+    }
+
     if (!drive) return;
     clock -= Math.max(1, drive.durationSeconds * paceScale[offense]);
+    state.stats[offense] = addStats(state.stats[offense], drive.stats);
 
     let next: Side = defense;
     let defensiveScore = false;
@@ -89,7 +115,7 @@ function playPeriod(
 }
 
 export function simulateGame(model: DriveModel, matchup: Matchup, config: SimConfig, rng: Rng): GameResult {
-  const state: GameState = { score: { home: 0, away: 0 }, drives: 0 };
+  const state: GameState = { score: { home: 0, away: 0 }, stats: { home: EMPTY_STATS, away: EMPTY_STATS }, drives: 0 };
   const openingReceiver: Side = rng.next() < 0.5 ? "home" : "away";
   playPeriod(model, matchup, config, state, { seconds: HALF_SECONDS, firstOffense: openingReceiver, suddenDeath: false }, rng);
   playPeriod(
@@ -119,5 +145,12 @@ export function simulateGame(model: DriveModel, matchup: Matchup, config: SimCon
     );
   }
 
-  return { homeScore: state.score.home, awayScore: state.score.away, drives: state.drives, overtime };
+  return {
+    homeScore: state.score.home,
+    awayScore: state.score.away,
+    homeStats: state.stats.home,
+    awayStats: state.stats.away,
+    drives: state.drives,
+    overtime,
+  };
 }

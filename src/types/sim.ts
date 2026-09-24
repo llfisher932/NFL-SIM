@@ -16,6 +16,30 @@ export type DriveOutcome = (typeof DRIVE_OUTCOMES)[number];
 
 export type Half = 1 | 2;
 
+export interface TeamGameStats {
+  passAttempts: number;
+  completions: number;
+  passYards: number;
+  passTds: number;
+  interceptions: number;
+  targets: number;
+  carries: number;
+  rushYards: number;
+  rushTds: number;
+}
+
+export const EMPTY_STATS: TeamGameStats = {
+  passAttempts: 0,
+  completions: 0,
+  passYards: 0,
+  passTds: 0,
+  interceptions: 0,
+  targets: 0,
+  carries: 0,
+  rushYards: 0,
+  rushTds: 0,
+};
+
 export interface DriveRecord extends SeasonWeek {
   gameId: string;
   half: Half;
@@ -27,6 +51,7 @@ export interface DriveRecord extends SeasonWeek {
   outcome: DriveOutcome;
   durationSeconds: number;
   nextStartYardline: number | null;
+  stats: TeamGameStats;
 }
 
 export interface ConversionCount extends SeasonWeek {
@@ -76,6 +101,8 @@ export interface Matchup {
 export interface GameResult {
   homeScore: number;
   awayScore: number;
+  homeStats: TeamGameStats;
+  awayStats: TeamGameStats;
   drives: number;
   overtime: boolean;
 }

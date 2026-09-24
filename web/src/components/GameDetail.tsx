@@ -19,6 +19,7 @@ const REASON_LABELS: Record<string, string> = {
   "not active": "Off active roster",
   "not on roster": "No longer on roster",
   "ruled out": "Ruled out",
+  resting: "Resting, seed locked",
 };
 
 const SIDE_COLOR = { away: "var(--away)", home: "var(--home)" } as const;
@@ -73,7 +74,12 @@ function InjuryCard({ team, side }: { team: DashboardTeam; side: "away" | "home"
               </span>
               <span className="muted">
                 {REASON_LABELS[o.reason] ?? o.reason}
-                {o.probability < 0.9 ? ` (${pct(o.probability)} to miss)` : ""} {"·"} usually {pct(o.role)} of snaps
+                {o.reason === "resting"
+                  ? ` (sits ~${pct(o.probability)} of snaps)`
+                  : o.probability < 0.9
+                    ? ` (${pct(o.probability)} to miss)`
+                    : ""}{" "}
+                {"·"} usually {pct(o.role)} of snaps
               </span>
             </li>
           ))}

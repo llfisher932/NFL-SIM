@@ -19,6 +19,7 @@ import {
 import type { PlayerOverride } from "../types/players";
 import type { WeekGame } from "../types/sim";
 import { choleskySolve, zeros } from "./linalg";
+import { lockedSeeds } from "./seeding";
 import { decayWeight, isBefore } from "./window";
 
 // Absence rates measured on 2021-2025 for players who took >= 30% of snaps the previous game.
@@ -37,6 +38,8 @@ export const DEFAULT_INJURY_CONFIG: InjuryConfig = {
   ridge: 2000,
   qbValueRidge: 20,
   qbQuality: { priorDropbacks: 200, replacementBelowLeague: 0.12 },
+  // Healthy regulars on locked teams played 41% of usual snaps in week 18 (2021-2025, 12 teams) vs 88% elsewhere.
+  resting: { minRole: 0.5, share: { QB: 0.75, RB: 0.6, WR: 0.6, TE: 0.6, OL: 0.5, DL: 0.5, LB: 0.5, DB: 0.5 } },
 };
 
 const SKILL_GROUPS = new Set(["QB", "RB", "WR", "TE"]);
@@ -179,11 +182,16 @@ export function applyInjuryEffects(features: TeamWeekFeatures, absence: TeamAbse
   };
 }
 
-// Skill players likely to miss the game, as overrides for player projections.
+// Skill players likely to miss the game, as overrides for player projections. Resting receivers and
+// backs keep a reduced share; a resting QB is ruled out since one passer takes the snaps.
 export function absenceOverrides(absence: TeamAbsence, threshold = 0.5): PlayerOverride[] {
-  return absence.missing
-    .filter((m) => SKILL_GROUPS.has(m.group) && m.probability >= threshold)
-    .map((m) => ({ season: absence.season, week: absence.week, playerId: m.playerId, status: "out" as const, note: "injury report / inactive" }));
+  return absence.missing.flatMap((m): PlayerOverride[] => {
+    if (!SKILL_GROUPS.has(m.group)) return [];
+    const base = { season: absence.season, week: absence.week, playerId: m.playerId };
+    if (m.reason === "resting" && m.group !== "QB") return [{ ...base, playing: 1 - m.probability, note: "resting starters" }];
+    if (m.probability < threshold) return [];
+    return [{ ...base, status: "out", note: m.reason === "resting" ? "resting starters" : "injury report / inactive" }];
+  });
 }
 
 export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
@@ -262,6 +270,21 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
     });
   }
 
+  const finalWeeks = new Map<number, number>();
+  for (const g of inputs.games) {
+    if (g.gameType === "REG") finalWeeks.set(g.season, Math.max(finalWeeks.get(g.season) ?? 0, g.week));
+  }
+  const lockedBySeason = new Map<number, Map<string, number>>();
+  function seedLocked(team: string, target: SeasonWeek): boolean {
+    if (finalWeeks.get(target.season) !== target.week) return false;
+    let locked = lockedBySeason.get(target.season);
+    if (!locked) {
+      locked = lockedSeeds(inputs.games, target.season);
+      lockedBySeason.set(target.season, locked);
+    }
+    return locked.has(team);
+  }
+
   const absenceCache = new Map<string, TeamAbsence>();
   function absenceAt(team: string, target: SeasonWeek): TeamAbsence {
     const cacheKey = key(target.season, target.week, team);
@@ -284,14 +307,21 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
     );
     let qbValue = 0;
     const missing: TeamAbsence["missing"] = [];
+    const resting = seedLocked(team, target);
     for (const r of roles) {
       const report = reports.get(`${cacheKey}:${r.playerId}`);
       const manual = inputs.availability.manualOuts?.has(`${target.season}:${target.week}:${r.playerId}`) ?? false;
-      const probability = manual ? 1 : absenceProbability(report, rosterPublished, gameday, config.absence);
+      let probability = manual ? 1 : absenceProbability(report, rosterPublished, gameday, config.absence);
+      let reason: AbsenceReason = manual ? "ruled out" : absenceReason(report, rosterPublished);
+      const restShare = config.resting.share[r.group];
+      if (resting && r.role >= config.resting.minRole && probability < restShare) {
+        probability = restShare;
+        reason = "resting";
+      }
       if (probability > 0) {
         add(r.group, r.role * probability);
         qbValue += r.role * probability * (qbValues.get(r.playerId) ?? 0);
-        missing.push({ ...r, probability, reason: manual ? "ruled out" : absenceReason(report, rosterPublished) });
+        missing.push({ ...r, probability, reason });
       }
     }
 

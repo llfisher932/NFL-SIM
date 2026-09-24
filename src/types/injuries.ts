@@ -40,7 +40,7 @@ export interface PlayerRole {
   role: number;
 }
 
-export type AbsenceReason = "out" | "doubtful" | "questionable" | "inactive" | "reserve" | "not active" | "not on roster" | "ruled out";
+export type AbsenceReason = "out" | "doubtful" | "questionable" | "inactive" | "reserve" | "not active" | "not on roster" | "ruled out" | "resting";
 
 export interface MissingPlayer {
   playerId: string;
@@ -87,4 +87,6 @@ export interface InjuryConfig {
   ridge: number;
   qbValueRidge: number;
   qbQuality: { priorDropbacks: number; replacementBelowLeague: number };
+  // Share of snaps regulars sit in the final regular-season week when their playoff seed is locked.
+  resting: { minRole: number; share: Record<PositionGroup, number> };
 }

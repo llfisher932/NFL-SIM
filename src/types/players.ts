@@ -54,6 +54,8 @@ export interface PlayerOverride extends SeasonWeek {
   status?: "out" | undefined;
   targetShare?: number | undefined;
   carryShare?: number | undefined;
+  // Fraction of his usual usage the player is expected to get, e.g. starters resting.
+  playing?: number | undefined;
   team?: string | undefined;
   name?: string | undefined;
   position?: SkillPosition | undefined;

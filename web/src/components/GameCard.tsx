@@ -37,9 +37,13 @@ export function GameCard({ game }: { game: DashboardGame }) {
   const { home, away } = game;
   const spreadGap = game.vegas.spread === null ? 0 : Math.abs(game.margin.mean - game.vegas.spread);
   const totalGap = game.vegas.total === null ? 0 : Math.abs(game.total.mean - game.vegas.total);
+  const resting = [away, home].filter((t) => t.out.some((o) => o.reason === "resting")).map((t) => t.team);
   const out = [away, home]
-    .flatMap((t) => t.out.filter((o) => o.role >= 0.5 && !DEPARTED.has(o.reason)).map((o) => ({ ...o, team: t.team })))
+    .flatMap((t) =>
+      t.out.filter((o) => o.role >= 0.5 && !DEPARTED.has(o.reason) && o.reason !== "resting").map((o) => ({ ...o, team: t.team })),
+    )
     .sort((a, b) => chipPriority(a.group) - chipPriority(b.group) || b.role - a.role);
+  const room = Math.max(0, MAX_CHIPS - resting.length);
   const correct = modelPickCorrect(game);
 
   return (
@@ -67,14 +71,19 @@ export function GameCard({ game }: { game: DashboardGame }) {
         <dd className={totalGap >= DISAGREEMENT_POINTS ? "disagree" : undefined}>Model {fixed(game.total.mean)}</dd>
         <dd className="vs">Vegas {game.vegas.total === null ? "—" : fixed(game.vegas.total)}</dd>
       </dl>
-      {out.length > 0 && (
-        <div className="chips" aria-label="Key players injured or inactive">
-          {out.slice(0, MAX_CHIPS).map((o) => (
+      {resting.length + out.length > 0 && (
+        <div className="chips" aria-label="Key players injured, inactive or resting">
+          {resting.map((team) => (
+            <span className="chip" key={`rest-${team}`}>
+              <b>{team}</b> resting starters
+            </span>
+          ))}
+          {out.slice(0, room).map((o) => (
             <span className="chip" key={o.playerId}>
               <b>{o.team}</b> {o.name} {o.group}
             </span>
           ))}
-          {out.length > MAX_CHIPS && <span className="chip">+{out.length - MAX_CHIPS} more</span>}
+          {out.length > room && <span className="chip">+{out.length - room} more</span>}
         </div>
       )}
       {game.final && (

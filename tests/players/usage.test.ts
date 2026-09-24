@@ -106,6 +106,18 @@ describe("players/usage", () => {
         expect(players.reduce((s, p) => s + p.targetShare, 0)).toBeCloseTo(1, 9);
       });
 
+      it("scales a partly playing receiver's share by the fraction he plays", () => {
+        const before = byName(usage().players, "WR1")!.targetShare;
+        const after = byName(usage([{ ...target, playerId: "00-0000002", playing: 0.4 }]).players, "WR1")!.targetShare;
+        expect(after).toBeCloseTo(before * 0.4, 9);
+      });
+
+      it("hands a partly playing receiver's lost share to teammates", () => {
+        const before = byName(usage().players, "WR2")!.targetShare;
+        const after = byName(usage([{ ...target, playerId: "00-0000002", playing: 0.4 }]).players, "WR2")!.targetShare;
+        expect(after).toBeGreaterThan(before);
+      });
+
       it("adds a new player with position-average efficiency", () => {
         const rookie: PlayerOverride = { ...target, playerId: "00-0000010", team: "BUF", name: "Rookie", position: "WR", targetShare: 0.1 };
         const added = byName(usage([rookie]).players, "Rookie")!;

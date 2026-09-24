@@ -25,6 +25,14 @@ describe("data/overrides", () => {
       expect(() => parseOverrides([{ ...base, week: 5, throughWeek: 4, status: "out" }])).toThrow("throughWeek before week");
     });
 
+    it("accepts a playing fraction", () => {
+      expect(parseOverrides([{ ...base, playing: 0.4 }])[0]).toMatchObject({ playing: 0.4 });
+    });
+
+    it("rejects an out player with a playing fraction", () => {
+      expect(() => parseOverrides([{ ...base, status: "out", playing: 0.4 }])).toThrow("out player with shares");
+    });
+
     it("accepts share overrides", () => {
       expect(parseOverrides([{ ...base, targetShare: 0.3, carryShare: 0 }])).toHaveLength(1);
     });

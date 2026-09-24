@@ -198,6 +198,24 @@ describe("features/injuries", () => {
     it("rules out likely-absent skill players only", () => {
       expect(absenceOverrides(absence).map((o) => [o.playerId, o.status])).toEqual([["00-0000001", "out"]]);
     });
+
+    describe("resting starters", () => {
+      const resting: TeamAbsence = {
+        ...absence,
+        missing: [
+          { playerId: "00-0000004", group: "WR", role: 0.9, probability: 0.6, reason: "resting" },
+          { playerId: "00-0000005", group: "QB", role: 1, probability: 0.75, reason: "resting" },
+        ],
+      };
+
+      it("keeps a resting receiver with a reduced share", () => {
+        expect(absenceOverrides(resting)[0]).toMatchObject({ playerId: "00-0000004", playing: 0.4 });
+      });
+
+      it("rules out a resting quarterback", () => {
+        expect(absenceOverrides(resting)[1]).toMatchObject({ playerId: "00-0000005", status: "out" });
+      });
+    });
   });
 
   describe("createInjuryModel", () => {
@@ -259,13 +277,14 @@ describe("features/injuries", () => {
       published: string[] = [],
       qbs = qbDropbacks,
       manual: string[] = [],
+      schedule: WeekGame[] = games,
     ): ReturnType<typeof createInjuryModel> {
       const inputs: InjuryModelInputs = {
         snaps,
         qbDropbacks: qbs,
         availability: { reports, rosterTeamWeeks: new Set(published), manualOuts: new Set(manual) },
         teamGames,
-        games,
+        games: schedule,
         weekFeatures,
         featureConfig: DEFAULT_FEATURE_CONFIG,
         config: DEFAULT_INJURY_CONFIG,
@@ -292,6 +311,58 @@ describe("features/injuries", () => {
 
     it("applies a manual out only to its week", () => {
       expect(build([], baseSnaps, [], qbDropbacks, ["2024:6:00-000000Q"]).absenceAt("BUF", week5).missing).toEqual([]);
+    });
+
+    describe("final week with a locked seed", () => {
+      const weekGame = (week: number, home: string, away: string, homeScore: number | null, awayScore: number | null): WeekGame => ({
+        gameId: `2024_0${week}_${away}_${home}`,
+        season: 2024,
+        week,
+        gameType: "REG",
+        kickoff: null,
+        home,
+        away,
+        neutralSite: false,
+        spreadLine: null,
+        totalLine: null,
+        homeMoneyline: null,
+        awayMoneyline: null,
+        homeScore,
+        awayScore,
+      });
+      // Before week 5, the last week, BUF is 4-0 and the AFC's top seed whatever happens; KC (0-4)
+      // and LV (1-3) race for the AFC West, with DEN (0-4) behind.
+      const lockedSeason = [
+        ...weeks.flatMap((w) => [
+          weekGame(w, "BUF", "ARI", 1, 0),
+          weekGame(w, "KC", "SF", 0, 1),
+          weekGame(w, "LV", "SEA", w === 1 ? 1 : 0, w === 1 ? 0 : 1),
+          weekGame(w, "DEN", "LA", 0, 1),
+        ]),
+        weekGame(5, "KC", "BUF", null, null),
+        weekGame(5, "LV", "DEN", null, null),
+      ];
+      const locked = (reports: AvailabilityReport[] = [], schedule = lockedSeason) =>
+        build(reports, baseSnaps, [], qbDropbacks, [], schedule);
+
+      it("rests a locked team's regulars by the measured share for their position", () => {
+        const qb = locked().absenceAt("BUF", week5).missing.find((m) => m.playerId === "00-000000Q");
+        expect(qb).toMatchObject({ reason: "resting", probability: DEFAULT_INJURY_CONFIG.resting.share.QB });
+      });
+
+      it("rests nobody on a team still playing for its seed", () => {
+        expect(locked().absenceAt("KC", week5).missing.filter((m) => m.reason === "resting")).toEqual([]);
+      });
+
+      it("keeps a regular who is ruled out fully out", () => {
+        const out = locked([report({ playerId: "00-000000Q", injuryStatus: "Out" })]).absenceAt("BUF", week5);
+        expect(out.missing.find((m) => m.playerId === "00-000000Q")).toMatchObject({ reason: "out", probability: 1 });
+      });
+
+      it("rests nobody before the final week", () => {
+        const longer = [...lockedSeason, weekGame(6, "BUF", "KC", null, null)];
+        expect(locked([], longer).absenceAt("BUF", week5).missing.filter((m) => m.reason === "resting")).toEqual([]);
+      });
     });
 
     it("values a missing QB by his EPA per dropback above replacement", () => {

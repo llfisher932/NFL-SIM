@@ -16,14 +16,21 @@ export const overrideSchema = z
     status: z.literal("out", { error: "invalid status" }).optional(),
     targetShare: share("targetShare").optional(),
     carryShare: share("carryShare").optional(),
+    playing: share("playing").optional(),
     team: z.string().regex(/^[A-Z]{2,3}$/, "invalid team").optional(),
     name: z.string().min(1, "missing name").optional(),
     position: z.enum(SKILL_POSITIONS, { error: "invalid position" }).optional(),
     note: z.string().optional(),
   })
   .strict()
-  .refine((o) => o.status !== undefined || o.targetShare !== undefined || o.carryShare !== undefined, "override does nothing")
-  .refine((o) => o.status === undefined || (o.targetShare === undefined && o.carryShare === undefined), "out player with shares")
+  .refine(
+    (o) => o.status !== undefined || o.targetShare !== undefined || o.carryShare !== undefined || o.playing !== undefined,
+    "override does nothing",
+  )
+  .refine(
+    (o) => o.status === undefined || (o.targetShare === undefined && o.carryShare === undefined && o.playing === undefined),
+    "out player with shares",
+  )
   .refine((o) => o.throughWeek === undefined || o.throughWeek >= o.week, "throughWeek before week");
 
 export const overridesFileSchema = z.array(overrideSchema, { error: "overrides must be a list" });

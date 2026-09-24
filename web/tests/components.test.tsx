@@ -38,6 +38,18 @@ describe("web/components", () => {
       expect(text(html)).not.toContain("Traded Player");
     });
 
+    it("collapses a team resting starters into one chip", () => {
+      const restingGame = game({
+        home: {
+          ...game().home,
+          out: ["00-0000101", "00-0000102"].map((playerId) => ({ playerId, name: playerId, group: "WR" as const, role: 0.9, probability: 0.6, reason: "resting" as const })),
+        },
+      });
+      const card = text(renderToStaticMarkup(<GameCard game={restingGame} />));
+      expect(card).toContain("LA resting starters");
+      expect(card).not.toContain("00-0000101");
+    });
+
     it("reports the model pick result with a label, not color alone", () => {
       expect(text(html)).toContain("Model pick lost");
     });

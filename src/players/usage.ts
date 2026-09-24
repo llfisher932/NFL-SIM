@@ -226,6 +226,13 @@ export function estimateTeamUsage(
       };
       players.push(player);
     }
+    if (o.playing !== undefined) {
+      for (const field of ["targetShare", "carryShare", "airYardsShare", "rzTargetShare", "rzCarryShare"] as const) {
+        player[field] *= o.playing;
+      }
+      fixedTargets.add(o.playerId);
+      fixedCarries.add(o.playerId);
+    }
     if (o.targetShare !== undefined) {
       player.targetShare = o.targetShare;
       player.rzTargetShare = o.targetShare;

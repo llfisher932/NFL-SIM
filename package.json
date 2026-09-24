@@ -1,0 +1,35 @@
+{
+  "name": "gridiron-sim",
+  "version": "0.1.0",
+  "description": "NFL game & player-stat Monte Carlo simulator",
+  "scripts": {
+    "ingest": "tsx src/cli/ingest.ts",
+    "epa": "tsx src/cli/epa.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.6.0",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.6.0",
+  "type": "module",
+  "dependencies": {
+    "@duckdb/node-api": "1.5.5-r.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  }
+}

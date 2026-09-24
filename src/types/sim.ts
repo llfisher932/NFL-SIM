@@ -62,6 +62,7 @@ export interface ConversionCount extends SeasonWeek {
 export interface WeekGame extends SeasonWeek {
   gameId: string;
   gameType: string;
+  kickoff: string | null;
   home: string;
   away: string;
   neutralSite: boolean;
@@ -116,6 +117,11 @@ export interface Distribution {
   p90: number;
 }
 
+export interface Histogram {
+  start: number;
+  counts: number[];
+}
+
 export interface GameProjection {
   sims: number;
   homeWinProb: number;
@@ -127,4 +133,6 @@ export interface GameProjection {
   total: Distribution;
   drivesPerGame: number;
   overtimeRate: number;
+  marginHistogram: Histogram;
+  totalHistogram: Histogram;
 }

@@ -16,6 +16,7 @@ function scheduledGames(seasons: number[], seed = 5): WeekGame[] {
     season: m.season,
     week: m.week,
     gameType: "REG",
+    kickoff: null,
     home: m.home,
     away: m.away,
     neutralSite: false,

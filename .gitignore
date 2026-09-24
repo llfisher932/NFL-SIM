@@ -2,3 +2,5 @@ node_modules/
 /data/
 *.duckdb
 *.duckdb.wal
+web/public/data/
+web/dist/

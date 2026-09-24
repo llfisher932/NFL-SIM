@@ -4,6 +4,7 @@ import {
   DEFENSE_GROUPS,
   OFFENSE_GROUPS,
   type AbsenceProbabilities,
+  type AbsenceReason,
   type Availability,
   type AvailabilityReport,
   type DefenseGroup,
@@ -60,6 +61,17 @@ export function absenceProbability(
     probability = Math.max(probability, gameday ? p.questionableGameday : p.questionablePregame);
   }
   return probability;
+}
+
+// Why a player is expected to miss: Out, then definitive roster status, then softer designations.
+export function absenceReason(report: AvailabilityReport | undefined, rosterPublished: boolean): AbsenceReason {
+  if (report?.injuryStatus === "Out") return "out";
+  if (report?.rosterStatus === "INA") return "inactive";
+  if (report?.rosterStatus === "RES") return "reserve";
+  if (report?.rosterStatus && report.rosterStatus !== "ACT") return "not active";
+  if (report?.injuryStatus === "Doubtful") return "doubtful";
+  if (report?.injuryStatus === "Questionable") return "questionable";
+  return rosterPublished ? "not on roster" : "questionable";
 }
 
 interface TeamGameRef extends SeasonWeek {
@@ -273,11 +285,12 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
     let qbValue = 0;
     const missing: TeamAbsence["missing"] = [];
     for (const r of roles) {
-      const probability = absenceProbability(reports.get(`${cacheKey}:${r.playerId}`), rosterPublished, gameday, config.absence);
+      const report = reports.get(`${cacheKey}:${r.playerId}`);
+      const probability = absenceProbability(report, rosterPublished, gameday, config.absence);
       if (probability > 0) {
         add(r.group, r.role * probability);
         qbValue += r.role * probability * (qbValues.get(r.playerId) ?? 0);
-        missing.push({ ...r, probability });
+        missing.push({ ...r, probability, reason: absenceReason(report, rosterPublished) });
       }
     }
 

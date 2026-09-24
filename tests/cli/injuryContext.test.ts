@@ -29,10 +29,10 @@ describe("cli/injuryContext", () => {
       defense: { DL: 0, LB: 0, DB: 0 },
       qbValue: 0,
       missing: [
-        { playerId: "00-0000002", group: "OL", role: 0.9, probability: 1 },
-        { playerId: "00-0000001", group: "QB", role: 1, probability: 1 },
-        { playerId: "00-0000003", group: "WR", role: 0.1, probability: 1 },
-        { playerId: "00-0000004", group: "TE", role: 0.8, probability: 0.24 },
+        { playerId: "00-0000002", group: "OL", role: 0.9, probability: 1, reason: "inactive" },
+        { playerId: "00-0000001", group: "QB", role: 1, probability: 1, reason: "out" },
+        { playerId: "00-0000003", group: "WR", role: 0.1, probability: 1, reason: "out" },
+        { playerId: "00-0000004", group: "TE", role: 0.8, probability: 0.24, reason: "questionable" },
       ],
     };
 

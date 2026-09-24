@@ -120,7 +120,7 @@ export async function loadConversionCounts(connection: DuckDBConnection): Promis
   }));
 }
 
-const GAME_COLUMNS = `game_id, season, week, game_type, home_team, away_team, location,
+const GAME_COLUMNS = `game_id, season, week, game_type, gameday, gametime, home_team, away_team, location,
   spread_line, total_line, home_moneyline, away_moneyline, home_score, away_score`;
 
 async function loadGames(
@@ -138,6 +138,7 @@ async function loadGames(
     season: Number(row["season"]),
     week: Number(row["week"]),
     gameType: String(row["game_type"]),
+    kickoff: row["gameday"] === null ? null : `${String(row["gameday"])}T${row["gametime"] === null ? "00:00" : String(row["gametime"])}`,
     home: String(row["home_team"]),
     away: String(row["away_team"]),
     neutralSite: row["location"] === "Neutral",

@@ -38,13 +38,23 @@ export interface PlayerRole {
   role: number;
 }
 
+export type AbsenceReason = "out" | "doubtful" | "questionable" | "inactive" | "reserve" | "not active" | "not on roster";
+
+export interface MissingPlayer {
+  playerId: string;
+  group: PositionGroup;
+  role: number;
+  probability: number;
+  reason: AbsenceReason;
+}
+
 export interface TeamAbsence extends SeasonWeek {
   team: string;
   offense: Record<OffenseGroup, number>;
   defense: Record<DefenseGroup, number>;
   // Missing QB quality: role x absence x EPA/dropback above replacement, net of what the rating absorbed.
   qbValue: number;
-  missing: { playerId: string; group: PositionGroup; role: number; probability: number }[];
+  missing: MissingPlayer[];
 }
 
 export interface InjuryEffects {

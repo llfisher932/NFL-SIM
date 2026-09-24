@@ -3,6 +3,7 @@ import { DEFAULT_FEATURE_CONFIG } from "../../src/features/config";
 import {
   absenceOverrides,
   absenceProbability,
+  absenceReason,
   applyInjuryEffects,
   createInjuryModel,
   DEFAULT_INJURY_CONFIG,
@@ -159,6 +160,26 @@ describe("features/injuries", () => {
     });
   });
 
+  describe("absenceReason", () => {
+    it("reports an Out designation first", () => {
+      expect(absenceReason(report({ rosterStatus: "INA", injuryStatus: "Out" }), true)).toBe("out");
+    });
+
+    it("prefers a definitive roster status over a softer designation", () => {
+      expect(absenceReason(report({ rosterStatus: "INA", injuryStatus: "Questionable" }), true)).toBe("inactive");
+      expect(absenceReason(report({ rosterStatus: "RES" }), true)).toBe("reserve");
+    });
+
+    it("uses the designation while the player is still active", () => {
+      expect(absenceReason(report({ injuryStatus: "Doubtful" }), true)).toBe("doubtful");
+    });
+
+    it("flags players missing from a published roster as departed", () => {
+      expect(absenceReason(undefined, true)).toBe("not on roster");
+      expect(absenceReason(report({ rosterStatus: "CUT" }), true)).toBe("not active");
+    });
+  });
+
   describe("absenceOverrides", () => {
     const absence: TeamAbsence = {
       season: 2024,
@@ -168,9 +189,9 @@ describe("features/injuries", () => {
       defense: { DL: 0, LB: 0, DB: 0 },
       qbValue: 0,
       missing: [
-        { playerId: "00-0000001", group: "WR", role: 0.8, probability: 1 },
-        { playerId: "00-0000002", group: "RB", role: 0.5, probability: 0.24 },
-        { playerId: "00-0000003", group: "OL", role: 1, probability: 1 },
+        { playerId: "00-0000001", group: "WR", role: 0.8, probability: 1, reason: "out" },
+        { playerId: "00-0000002", group: "RB", role: 0.5, probability: 0.24, reason: "questionable" },
+        { playerId: "00-0000003", group: "OL", role: 1, probability: 1, reason: "inactive" },
       ],
     };
 

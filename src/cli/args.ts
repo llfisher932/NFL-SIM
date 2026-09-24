@@ -27,6 +27,21 @@ export function parseSeasons(input: string): number[] {
   return [...new Set(tokens.flatMap(parseSeasonToken))].sort((a, b) => a - b);
 }
 
+export function parseWeeks(input: string | undefined): number[] {
+  if (input === undefined) throw new Error("missing weeks");
+  const tokens = input.split(",").map((t) => t.trim()).filter(Boolean);
+  if (tokens.length === 0) throw new Error("missing weeks");
+  const weeks = tokens.flatMap((token) => {
+    const range = /^(\d{1,2})-(\d{1,2})$/.exec(token);
+    if (!range) return [weekSchema.parse(token)];
+    const from = weekSchema.parse(range[1]);
+    const to = weekSchema.parse(range[2]);
+    if (from > to) throw new Error(`invalid week range: ${token}`);
+    return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+  });
+  return [...new Set(weeks)].sort((x, y) => x - y);
+}
+
 export function parseSeason(input: string | undefined): number {
   if (input === undefined) throw new Error("missing season");
   return seasonSchema.parse(input);

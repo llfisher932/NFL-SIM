@@ -7,13 +7,16 @@
     "features": "tsx src/cli/features.ts",
     "sim": "tsx src/cli/sim.ts",
     "players": "tsx src/cli/players.ts",
+    "export": "tsx src/cli/export.ts",
+    "dashboard": "vite --config web/vite.config.ts",
+    "dashboard:build": "vite build --config web/vite.config.ts",
     "backtest": "tsx src/cli/backtest.ts",
     "player-backtest": "tsx src/cli/playerBacktest.ts",
     "tune": "tsx src/cli/tune.ts",
     "epa": "tsx src/cli/epa.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc"
+    "typecheck": "tsc && tsc -p web"
   },
   "devEngines": {
     "packageManager": {
@@ -26,12 +29,18 @@
   "type": "module",
   "dependencies": {
     "@duckdb/node-api": "1.5.5-r.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
+    "vite": "^8.3.0",
     "vitest": "^5.0.1"
   },
   "private": true,

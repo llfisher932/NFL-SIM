@@ -8,6 +8,7 @@ import {
   parseSeed,
   parseSims,
   parseWeek,
+  parseWeeks,
 } from "../../src/cli/args";
 
 describe("cli/args", () => {
@@ -66,6 +67,28 @@ describe("cli/args", () => {
 
     it("rejects a missing value", () => {
       expect(() => parseWeek(undefined)).toThrow("missing week");
+    });
+  });
+
+  describe("parseWeeks", () => {
+    it("expands a range", () => {
+      expect(parseWeeks("1-4")).toEqual([1, 2, 3, 4]);
+    });
+
+    it("combines lists and ranges, sorted and deduplicated", () => {
+      expect(parseWeeks("18, 1-2,2")).toEqual([1, 2, 18]);
+    });
+
+    it("rejects a week outside 1-22", () => {
+      expect(() => parseWeeks("0-3")).toThrow("invalid week");
+    });
+
+    it("rejects a reversed range", () => {
+      expect(() => parseWeeks("5-2")).toThrow("invalid week range: 5-2");
+    });
+
+    it("requires a value", () => {
+      expect(() => parseWeeks(undefined)).toThrow("missing weeks");
     });
   });
 

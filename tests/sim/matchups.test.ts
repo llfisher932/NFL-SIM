@@ -28,6 +28,7 @@ const game: WeekGame = {
   season: 2025,
   week: 5,
   gameType: "REG",
+  kickoff: null,
   home: "LA",
   away: "SF",
   neutralSite: false,

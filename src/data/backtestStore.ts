@@ -50,3 +50,33 @@ export async function writeBacktestPredictions(
   }
   appender.closeSync();
 }
+
+export async function loadBacktestPredictions(connection: DuckDBConnection): Promise<BacktestPrediction[] | null> {
+  const exists = await connection.runAndReadAll(
+    `SELECT count(*)::INTEGER AS n FROM information_schema.tables WHERE table_name = '${BACKTEST_TABLE}'`,
+  );
+  if (Number(exists.getRowObjectsJS()[0]?.["n"]) === 0) return null;
+  const reader = await connection.runAndReadAll(`SELECT * FROM ${BACKTEST_TABLE} ORDER BY season, week, game_id`);
+  const nullable = (v: unknown) => (v === null ? null : Number(v));
+  return reader.getRowObjectsJS().map((r) => ({
+    gameId: String(r["game_id"]),
+    season: Number(r["season"]),
+    week: Number(r["week"]),
+    home: String(r["home_team"]),
+    away: String(r["away_team"]),
+    neutralSite: Boolean(r["neutral_site"]),
+    homeWinProb: Number(r["home_win_prob"]),
+    tieProb: Number(r["tie_prob"]),
+    marginMean: Number(r["margin_mean"]),
+    marginP10: Number(r["margin_p10"]),
+    marginP90: Number(r["margin_p90"]),
+    totalMean: Number(r["total_mean"]),
+    totalP10: Number(r["total_p10"]),
+    totalP90: Number(r["total_p90"]),
+    spreadLine: nullable(r["spread_line"]),
+    totalLine: nullable(r["total_line"]),
+    marketHomeWinProb: nullable(r["market_home_win_prob"]),
+    homeScore: Number(r["home_score"]),
+    awayScore: Number(r["away_score"]),
+  }));
+}

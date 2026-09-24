@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fitDriveModel } from "../../src/sim/driveModel";
-import { distribution, projectGame, quantile } from "../../src/sim/monteCarlo";
+import { distribution, histogram, projectGame, quantile } from "../../src/sim/monteCarlo";
 import type { Matchup } from "../../src/types/sim";
 import { conversions, fixedRatings, syntheticDrives, testSimConfig } from "../fixtures/drives";
 
@@ -54,6 +54,16 @@ describe("sim/monteCarlo", () => {
     });
   });
 
+  describe("histogram", () => {
+    it("counts each integer value from the minimum to the maximum", () => {
+      expect(histogram(Float64Array.from([-3, 0, 0, 3, 7]))).toEqual({ start: -3, counts: [1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 1] });
+    });
+
+    it("is empty for no values", () => {
+      expect(histogram(new Float64Array())).toEqual({ start: 0, counts: [] });
+    });
+  });
+
   describe("projectGame", () => {
     const even = projectGame(model, matchup(0, 0), testSimConfig, 2000, 1);
 
@@ -87,6 +97,12 @@ describe("sim/monteCarlo", () => {
 
     it("keeps the mean total equal to the sum of mean scores", () => {
       expect(even.total.mean).toBeCloseTo(even.homeScore.mean + even.awayScore.mean, 9);
+    });
+
+    it("returns margin and total histograms that cover every sim", () => {
+      const sum = (h: { counts: number[] }) => h.counts.reduce((a, b) => a + b, 0);
+      expect(sum(even.marginHistogram)).toBe(2000);
+      expect(sum(even.totalHistogram)).toBe(2000);
     });
 
     it("rejects a non-positive sim count", () => {

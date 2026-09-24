@@ -158,3 +158,54 @@ export const playerWeeklyStatsRowSchema = z.object({
   air_yards_share: num("air_yards_share").nullable(),
   fantasy_points_ppr: num("fantasy_points_ppr").nullable(),
 });
+
+const gameType = oneOf("game_type", ["REG", "WC", "DIV", "CON", "SB"]);
+const fraction = (field: string) => num(field, 0, 1);
+
+export const injuryReportRowSchema = z.object({
+  season,
+  game_type: gameType,
+  week,
+  team: team("team"),
+  gsis_id: matching("gsis_id", GSIS_ID),
+  position: z.string({ error: issueMessage("position") }),
+  full_name: text("full_name"),
+  report_status: oneOf("report_status", ["Out", "Doubtful", "Questionable", "Note"]).nullable(),
+  practice_status: z.string({ error: issueMessage("practice_status") }).nullable(),
+});
+
+export const snapCountRowSchema = z.object({
+  game_id: matching("game_id", GAME_ID),
+  season,
+  game_type: gameType,
+  week,
+  player: text("player"),
+  pfr_player_id: text("pfr_player_id"),
+  position: text("position"),
+  team: team("team"),
+  opponent: team("opponent"),
+  offense_snaps: num("offense_snaps", 0, 200),
+  offense_pct: fraction("offense_pct"),
+  defense_snaps: num("defense_snaps", 0, 200),
+  defense_pct: fraction("defense_pct"),
+});
+
+export const weeklyRosterRowSchema = z.object({
+  season,
+  week,
+  game_type: gameType,
+  team: team("team"),
+  gsis_id: matching("gsis_id", GSIS_ID),
+  full_name: text("full_name"),
+  position: text("position").nullable(),
+  depth_chart_position: z.string({ error: issueMessage("depth_chart_position") }).nullable(),
+  status: text("status"),
+});
+
+export const playerRowSchema = z.object({
+  gsis_id: matching("gsis_id", GSIS_ID),
+  display_name: text("display_name"),
+  pfr_id: z.string({ error: issueMessage("pfr_id") }).nullable(),
+  position: z.string({ error: issueMessage("position") }).nullable(),
+  position_group: z.string({ error: issueMessage("position_group") }).nullable(),
+});

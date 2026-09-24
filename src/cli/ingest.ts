@@ -19,7 +19,7 @@ const { values } = parseArgs({
 
 function printLoadReports(reports: readonly TableLoadReport[]): void {
   const rows = reports.flatMap((r) =>
-    r.seasons.map((s) => [r.table, s.season, s.loaded.toLocaleString("en-US"), s.rejected]),
+    r.seasons.map((s) => [r.table, s.season ?? "all", s.loaded.toLocaleString("en-US"), s.rejected]),
   );
   console.log(`\n${formatTable(["table", "season", "rows", "rejected"], rows)}`);
 

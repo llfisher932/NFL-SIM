@@ -6,6 +6,7 @@ import { loadPlayerGames } from "../data/playerGames";
 import { loadTeamGames } from "../data/teamGames";
 import { evaluatePlayers, trailingBaseline, type PlayerEvalRow, type StatEval } from "../eval/playerEval";
 import { DEFAULT_FEATURE_CONFIG } from "../features/config";
+import { absenceOverrides, createInjuryModel } from "../features/injuries";
 import { createFeatureModel } from "../features/teamFeatures";
 import { DEFAULT_PLAYER_CONFIG } from "../players/config";
 import { projectWeek } from "../players/projectWeek";
@@ -13,6 +14,7 @@ import { DEFAULT_SEED, DEFAULT_SIM_CONFIG } from "../sim/config";
 import { fitDriveModel } from "../sim/driveModel";
 import { createWeekFeatureCache, ratingLookupFrom, teamsBySeason } from "../sim/matchups";
 import { cliErrorMessage, parseSeason, parseSeed, parseSims, parseWeek } from "./args";
+import { loadInjuryInputs, mergeOverrides } from "./injuryContext";
 import { fixed, formatTable, type Cell } from "./format";
 
 const { values } = parseArgs({
@@ -25,6 +27,7 @@ const { values } = parseArgs({
     "target-cv": { type: "string", default: String(DEFAULT_PLAYER_CONFIG.shareVolatility.targets) },
     "carry-cv": { type: "string", default: String(DEFAULT_PLAYER_CONFIG.shareVolatility.carries) },
     "rush-yards-cv": { type: "string", default: String(DEFAULT_PLAYER_CONFIG.yardsCv.rushing) },
+    "no-injuries": { type: "boolean", default: false },
     db: { type: "string", default: DEFAULT_DB_PATH },
   },
 });
@@ -65,7 +68,8 @@ async function main(): Promise<void> {
         drives: await loadDrives(db.connection),
         conversions: await loadConversionCounts(db.connection),
         playerGames: await loadPlayerGames(db.connection),
-        games: await loadSeasonGames(db.connection, [season]),
+        games: await loadSeasonGames(db.connection, Array.from({ length: season - 2020 }, (_, i) => 2021 + i)),
+        injuries: await loadInjuryInputs(db.connection, !values["no-injuries"]),
       };
     } finally {
       db.close();
@@ -76,18 +80,23 @@ async function main(): Promise<void> {
     createFeatureModel(data.teamGames, DEFAULT_FEATURE_CONFIG),
     teamsBySeason(data.teamGames, data.games),
   );
+  const injuryModel = data.injuries
+    ? createInjuryModel({ ...data.injuries, teamGames: data.teamGames, games: data.games, weekFeatures, featureConfig: DEFAULT_FEATURE_CONFIG })
+    : null;
   const actualByKey = new Map(data.playerGames.map((g) => [`${g.gameId}:${g.playerId}`, g]));
   const rows: PlayerEvalRow[] = [];
   for (const week of weeks) {
     const target = { season, week };
-    const games = data.games.filter((g) => g.week === week && g.homeScore !== null);
+    const games = data.games.filter((g) => g.season === season && g.week === week && g.homeScore !== null);
+    const adjusted = injuryModel?.adjust(weekFeatures(target), target);
+    const automatic = adjusted ? [...adjusted.absences.values()].flatMap((a) => absenceOverrides(a)) : [];
     const projections = projectWeek({
       target,
       games,
       model: fitDriveModel(data.drives, data.conversions, target, ratingLookupFrom(weekFeatures), DEFAULT_SIM_CONFIG),
-      features: weekFeatures(target),
+      features: adjusted?.features ?? weekFeatures(target),
       playerGames: data.playerGames,
-      overrides,
+      overrides: mergeOverrides(overrides, automatic),
       simConfig: DEFAULT_SIM_CONFIG,
       playerConfig,
       sims,

@@ -9,9 +9,14 @@ import { DEFAULT_FEATURE_CONFIG } from "../features/config";
 import { DEFAULT_SEED, DEFAULT_SIM_CONFIG } from "../sim/config";
 import type { CalibrationBucket, HitRate, ScoreCard } from "../types/eval";
 import { cliErrorMessage, parseHalfLife, parseHfa, parseSeasons, parseSeed, parseSims } from "./args";
+import { loadInjuryInputs } from "./injuryContext";
 import { fixed, formatTable, type Cell } from "./format";
 
 const DEFAULT_BACKTEST_SIMS = 2000;
+const FIRST_DATA_SEASON = 2021;
+
+const allSeasonsThrough = (seasons: readonly number[]) =>
+  Array.from({ length: Math.max(...seasons) - FIRST_DATA_SEASON + 1 }, (_, i) => FIRST_DATA_SEASON + i);
 
 const { values } = parseArgs({
   options: {
@@ -20,6 +25,7 @@ const { values } = parseArgs({
     seed: { type: "string", default: String(DEFAULT_SEED) },
     "hfa-epa": { type: "string", default: String(DEFAULT_SIM_CONFIG.homeFieldEpa) },
     "half-life": { type: "string", default: String(DEFAULT_FEATURE_CONFIG.halfLifeWeeks) },
+    "no-injuries": { type: "boolean", default: false },
     db: { type: "string", default: DEFAULT_DB_PATH },
   },
 });
@@ -60,11 +66,13 @@ async function main(): Promise<void> {
       teamGames: await loadTeamGames(db.connection),
       drives: await loadDrives(db.connection),
       conversions: await loadConversionCounts(db.connection),
-      games: await loadSeasonGames(db.connection, seasons),
+      games: await loadSeasonGames(db.connection, allSeasonsThrough(seasons)),
+      injuries: await loadInjuryInputs(db.connection, !values["no-injuries"]),
     };
     console.log(
       `Walk-forward backtest ${seasons[0]}-${seasons[seasons.length - 1]}: ${sims.toLocaleString("en-US")} sims/game, ` +
-        `seed ${seed}, home-field ${simConfig.homeFieldEpa} EPA/play, half-life ${featureConfig.halfLifeWeeks} weeks`,
+        `seed ${seed}, home-field ${simConfig.homeFieldEpa} EPA/play, half-life ${featureConfig.halfLifeWeeks} weeks, ` +
+        `injuries ${inputs.injuries ? "on" : "off"}`,
     );
 
     const started = Date.now();

@@ -1,8 +1,10 @@
 import { parseArgs } from "node:util";
 import { DEFAULT_DB_PATH, openDatabase } from "../data/db";
-import { loadConversionCounts, loadDrives, loadWeekGames } from "../data/drives";
+import { loadConversionCounts, loadDrives, loadSeasonGames, loadWeekGames } from "../data/drives";
+import { loadPlayerNames } from "../data/availability";
 import { loadTeamGames } from "../data/teamGames";
 import { DEFAULT_FEATURE_CONFIG } from "../features/config";
+import { createInjuryModel } from "../features/injuries";
 import { createFeatureModel } from "../features/teamFeatures";
 import { DEFAULT_SEED, DEFAULT_SIM_CONFIG, DEFAULT_SIMS } from "../sim/config";
 import { fitDriveModel } from "../sim/driveModel";
@@ -10,6 +12,7 @@ import { buildMatchup, createWeekFeatureCache, ratingLookupFrom, teamsBySeason }
 import { projectGame } from "../sim/monteCarlo";
 import { hashSeed } from "../sim/rng";
 import { cliErrorMessage, parseHfa, parseSeason, parseSeed, parseSims, parseWeek } from "./args";
+import { describeAbsence, loadInjuryInputs } from "./injuryContext";
 import { fixed, formatTable } from "./format";
 
 const { values } = parseArgs({
@@ -19,6 +22,7 @@ const { values } = parseArgs({
     sims: { type: "string", default: String(DEFAULT_SIMS) },
     seed: { type: "string", default: String(DEFAULT_SEED) },
     "hfa-epa": { type: "string", default: String(DEFAULT_SIM_CONFIG.homeFieldEpa) },
+    "no-injuries": { type: "boolean", default: false },
     db: { type: "string", default: DEFAULT_DB_PATH },
   },
 });
@@ -33,13 +37,16 @@ async function main(): Promise<void> {
   const config = { ...DEFAULT_SIM_CONFIG, homeFieldEpa: parseHfa(values["hfa-epa"]) };
 
   const db = await openDatabase(values.db);
-  const [teamGames, drives, conversions, games] = await (async () => {
+  const [teamGames, drives, conversions, games, allGames, injuryInputs, names] = await (async () => {
     try {
       return [
         await loadTeamGames(db.connection),
         await loadDrives(db.connection),
         await loadConversionCounts(db.connection),
         await loadWeekGames(db.connection, target.season, target.week),
+        await loadSeasonGames(db.connection, Array.from({ length: target.season - 2020 }, (_, i) => 2021 + i)),
+        await loadInjuryInputs(db.connection, !values["no-injuries"]),
+        await loadPlayerNames(db.connection),
       ] as const;
     } finally {
       db.close();
@@ -49,15 +56,29 @@ async function main(): Promise<void> {
 
   const weekFeatures = createWeekFeatureCache(
     createFeatureModel(teamGames, DEFAULT_FEATURE_CONFIG),
-    teamsBySeason(teamGames, games),
+    teamsBySeason(teamGames, allGames),
   );
   const model = fitDriveModel(drives, conversions, target, ratingLookupFrom(weekFeatures), config);
-  const features = weekFeatures(target);
+  const injuries = injuryInputs
+    ? createInjuryModel({ ...injuryInputs, teamGames, games: allGames, weekFeatures, featureConfig: DEFAULT_FEATURE_CONFIG }).adjust(
+        weekFeatures(target),
+        target,
+      )
+    : null;
+  const features = injuries?.features ?? weekFeatures(target);
 
   console.log(
     `${target.season} week ${target.week}: ${games.length} games, ${sims.toLocaleString("en-US")} sims each, ` +
-      `seed ${seed}, home-field ${config.homeFieldEpa} EPA/play, ${model.trainingDrives.toLocaleString("en-US")} training drives\n`,
+      `seed ${seed}, home-field ${config.homeFieldEpa} EPA/play, ${model.trainingDrives.toLocaleString("en-US")} training drives, ` +
+      `injuries ${injuries ? "on" : "off"}\n`,
   );
+
+  const netShift = (team: string) => {
+    const before = weekFeatures(target).get(team)!;
+    const after = features.get(team)!;
+    return after.offense.all - after.defense.all - (before.offense.all - before.defense.all);
+  };
+  const injuryShift = (away: string, home: string) => `${signed(netShift(away), 3)}/${signed(netShift(home), 3)}`;
 
   const rows = games.map((game) => {
     const p = projectGame(model, buildMatchup(features, game), config, sims, hashSeed(seed, game.gameId));
@@ -74,16 +95,26 @@ async function main(): Promise<void> {
       `${fixed(p.total.p10, 0)}..${fixed(p.total.p90, 0)}`,
       game.totalLine === null ? "" : fixed(game.totalLine, 1),
       actual,
+      injuries ? injuryShift(game.away, game.home) : "",
     ];
   });
 
   console.log(
     formatTable(
-      ["game", "home win%", "score (A-H)", "margin", "margin p10..p90", "vegas", "total", "total p10..p90", "vegas", "actual"],
+      ["game", "home win%", "score (A-H)", "margin", "margin p10..p90", "vegas", "total", "total p10..p90", "vegas", "actual", "injury shift (A/H)"],
       rows,
     ),
   );
   console.log("\nmargin and vegas spread are from the home team's side (positive = home favored)");
+  if (injuries) {
+    console.log("injury shift = change in net rating (offense - defense, EPA/play) from missing players; regulars out:");
+    for (const game of games) {
+      for (const team of [game.away, game.home]) {
+        const out = describeAbsence(injuries.absences.get(team), names);
+        if (out) console.log(`  ${team}: ${out}`);
+      }
+    }
+  }
 }
 
 main().catch((err: unknown) => {

@@ -57,11 +57,11 @@ async function readSeasonRows(
   connection: DuckDBConnection,
   spec: TableSpec,
   columns: readonly string[],
-  season: number,
+  season: number | null,
 ): Promise<KeyedRow<bigint>[]> {
   const reader = await connection.runAndReadAll(
     `SELECT rowid AS _rowid, (${spec.keySql}) AS _key, ${columns.map(quoteIdent).join(", ")}
-     FROM ${quoteIdent(spec.table)} WHERE season = ${season}`,
+     FROM ${quoteIdent(spec.table)}${season === null ? "" : ` WHERE season = ${season}`}`,
   );
   return reader.getRowObjectsJS().map(({ _rowid, _key, ...fields }) => ({
     id: _rowid as bigint,
@@ -73,14 +73,15 @@ async function readSeasonRows(
 async function recordRejects(
   connection: DuckDBConnection,
   table: string,
-  season: number,
+  season: number | null,
   rejects: readonly RowReject<bigint>[],
 ): Promise<void> {
   if (rejects.length === 0) return;
   const appender = await connection.createAppender(REJECTS_TABLE);
   for (const reject of rejects) {
     appender.appendVarchar(table);
-    appender.appendInteger(season);
+    if (season === null) appender.appendNull();
+    else appender.appendInteger(season);
     appender.appendVarchar(reject.key);
     appender.appendVarchar(reject.reason);
     appender.endRow();
@@ -109,6 +110,7 @@ export async function loadTable(
   const table = quoteIdent(spec.table);
   const files = parquetPaths.map((p) => quoteLiteral(p.replaceAll("\\", "/"))).join(", ");
   const columns = Object.keys(spec.schema.shape);
+  const seasonal = spec.seasonal !== false;
 
   await ensureRejectsTable(connection);
   await connection.run("BEGIN TRANSACTION");
@@ -116,7 +118,7 @@ export async function loadTable(
     await connection.run(
       `CREATE OR REPLACE TABLE ${table} AS
        SELECT * FROM read_parquet([${files}], union_by_name = true)
-       WHERE season IN (${seasons.join(", ")})`,
+       ${seasonal ? `WHERE season IN (${seasons.join(", ")})` : ""}`,
     );
     const missing = await missingColumns(connection, spec.table, columns);
     if (missing.length > 0) throw new Error(`${spec.table}: missing columns ${missing.join(", ")}`);
@@ -126,7 +128,7 @@ export async function loadTable(
     const rejectReasons: Record<string, number> = {};
     const rejectedIds: bigint[] = [];
 
-    for (const season of seasons) {
+    for (const season of seasonal ? seasons : [null]) {
       const rows = await readSeasonRows(connection, spec, columns, season);
       const rejects = findRejects(rows, spec.schema);
       await recordRejects(connection, spec.table, season, rejects);

@@ -1,11 +1,12 @@
 import { parseArgs } from "node:util";
 import { DEFAULT_DB_PATH, openDatabase } from "../data/db";
-import { loadConversionCounts, loadDrives, loadWeekGames } from "../data/drives";
+import { loadConversionCounts, loadDrives, loadSeasonGames, loadWeekGames } from "../data/drives";
 import { DEFAULT_OVERRIDES_PATH, loadOverrides } from "../data/overrides";
 import { loadPlayerGames } from "../data/playerGames";
 import { PLAYER_PROJECTIONS_TABLE, writePlayerProjections } from "../data/playerProjectionStore";
 import { loadTeamGames } from "../data/teamGames";
 import { DEFAULT_FEATURE_CONFIG } from "../features/config";
+import { absenceOverrides, createInjuryModel } from "../features/injuries";
 import { createFeatureModel } from "../features/teamFeatures";
 import { DEFAULT_PLAYER_CONFIG } from "../players/config";
 import { projectWeek } from "../players/projectWeek";
@@ -14,6 +15,7 @@ import { fitDriveModel } from "../sim/driveModel";
 import { createWeekFeatureCache, ratingLookupFrom, teamsBySeason } from "../sim/matchups";
 import type { PlayerProjection, StatSummary } from "../types/players";
 import { cliErrorMessage, parseSeason, parseSeed, parseSims, parseWeek } from "./args";
+import { loadInjuryInputs, mergeOverrides } from "./injuryContext";
 import { fixed, formatTable, type Cell } from "./format";
 
 const { values } = parseArgs({
@@ -26,6 +28,7 @@ const { values } = parseArgs({
     team: { type: "string" },
     "min-touches": { type: "string", default: "1" },
     "show-ids": { type: "boolean", default: false },
+    "no-injuries": { type: "boolean", default: false },
     db: { type: "string", default: DEFAULT_DB_PATH },
   },
 });
@@ -71,15 +74,29 @@ async function main(): Promise<void> {
       (g) => !values.team || g.home === values.team || g.away === values.team,
     );
     if (games.length === 0) throw new Error(`no games for ${target.season} week ${target.week}`);
+    const allGames = await loadSeasonGames(db.connection, Array.from({ length: target.season - 2020 }, (_, i) => 2021 + i));
+    const injuryInputs = await loadInjuryInputs(db.connection, !values["no-injuries"]);
 
-    const weekFeatures = createWeekFeatureCache(createFeatureModel(teamGames, DEFAULT_FEATURE_CONFIG), teamsBySeason(teamGames, games));
+    const weekFeatures = createWeekFeatureCache(createFeatureModel(teamGames, DEFAULT_FEATURE_CONFIG), teamsBySeason(teamGames, allGames));
     const model = fitDriveModel(drives, conversions, target, ratingLookupFrom(weekFeatures), DEFAULT_SIM_CONFIG);
-    const features = weekFeatures(target);
-    const weekOverrides = overrides.filter((o) => o.season === target.season && o.week === target.week);
+    const injuries = injuryInputs
+      ? createInjuryModel({ ...injuryInputs, teamGames, games: allGames, weekFeatures, featureConfig: DEFAULT_FEATURE_CONFIG }).adjust(
+          weekFeatures(target),
+          target,
+        )
+      : null;
+    const features = injuries?.features ?? weekFeatures(target);
+    const playing = new Set(games.flatMap((g) => [g.home, g.away]));
+    const automatic = injuries
+      ? [...injuries.absences.values()].filter((a) => playing.has(a.team)).flatMap((a) => absenceOverrides(a))
+      : [];
+    const manual = overrides.filter((o) => o.season === target.season && o.week === target.week);
+    const weekOverrides = mergeOverrides(manual, automatic);
 
     console.log(
       `${target.season} week ${target.week} player projections: ${sims.toLocaleString("en-US")} sims/game, seed ${seed}, ` +
-        `${weekOverrides.length} overrides from ${values.overrides}`,
+        `${manual.length} manual overrides from ${values.overrides}, ` +
+        `${automatic.length} automatic injury outs${injuries ? "" : " (injuries off)"}`,
     );
     console.log("ranges are p10/p50/p90; TD = rushing + receiving touchdowns\n");
 
@@ -89,7 +106,7 @@ async function main(): Promise<void> {
       model,
       features,
       playerGames,
-      overrides,
+      overrides: weekOverrides,
       simConfig: DEFAULT_SIM_CONFIG,
       playerConfig: DEFAULT_PLAYER_CONFIG,
       sims,

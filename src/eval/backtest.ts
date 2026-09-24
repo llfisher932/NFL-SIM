@@ -1,3 +1,4 @@
+import { createInjuryModel, type InjuryModel } from "../features/injuries";
 import { createFeatureModel } from "../features/teamFeatures";
 import { fitDriveModel, type DriveModel } from "../sim/driveModel";
 import {
@@ -11,14 +12,23 @@ import { projectGame } from "../sim/monteCarlo";
 import { hashSeed } from "../sim/rng";
 import type { BacktestPrediction } from "../types/eval";
 import type { FeatureConfig, SeasonWeek, TeamGame } from "../types/features";
+import type { Availability, InjuryConfig, PlayerSnap, QbDropbacks, TeamAbsence } from "../types/injuries";
 import type { ConversionCount, DriveRecord, SimConfig, WeekGame } from "../types/sim";
 import { devigHomeWinProbability } from "./market";
+
+export interface InjuryInputs {
+  snaps: readonly PlayerSnap[];
+  qbDropbacks: readonly QbDropbacks[];
+  availability: Availability;
+  config: InjuryConfig;
+}
 
 export interface BacktestInputs {
   teamGames: readonly TeamGame[];
   drives: readonly DriveRecord[];
   conversions: readonly ConversionCount[];
   games: readonly WeekGame[];
+  injuries?: InjuryInputs | undefined;
 }
 
 export interface BacktestOptions {
@@ -59,6 +69,7 @@ export interface BacktestWeek {
   games: CompletedGame[];
   model: DriveModel;
   features: WeekFeatures;
+  absences: ReadonlyMap<string, TeamAbsence>;
   done: number;
   total: number;
 }
@@ -70,15 +81,26 @@ export function* backtestPlan(inputs: BacktestInputs, options: BacktestOptions):
     teamsBySeason(inputs.teamGames, inputs.games),
   );
   const ratings = ratingLookupFrom(weekFeatures);
+  const injuries: InjuryModel | null = inputs.injuries
+    ? createInjuryModel({
+        ...inputs.injuries,
+        teamGames: inputs.teamGames,
+        games: inputs.games,
+        weekFeatures,
+        featureConfig: options.featureConfig,
+      })
+    : null;
   const weeks = backtestWeeks(inputs.games, options.seasons);
   for (const [index, target] of weeks.entries()) {
+    const adjusted = injuries?.adjust(weekFeatures(target), target);
     yield {
       target,
       games: inputs.games.filter(
         (g): g is CompletedGame => g.season === target.season && g.week === target.week && isCompleted(g),
       ),
       model: fitDriveModel(inputs.drives, inputs.conversions, target, ratings, options.simConfig),
-      features: weekFeatures(target),
+      features: adjusted?.features ?? weekFeatures(target),
+      absences: adjusted?.absences ?? new Map(),
       done: index + 1,
       total: weeks.length,
     };

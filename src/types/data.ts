@@ -9,7 +9,14 @@ export type PbpRow = z.infer<typeof pbpRowSchema>;
 export type ScheduleRow = z.infer<typeof scheduleRowSchema>;
 export type PlayerWeeklyStatsRow = z.infer<typeof playerWeeklyStatsRowSchema>;
 
-export type DatasetId ="pbp" | "schedules" | "player_weekly_stats";
+export type DatasetId =
+  | "pbp"
+  | "schedules"
+  | "player_weekly_stats"
+  | "injury_reports"
+  | "snap_counts"
+  | "weekly_rosters"
+  | "players";
 
 export interface RawFile {
   dataset: DatasetId;
@@ -27,7 +34,7 @@ export interface CachedFile {
 }
 
 export interface SeasonLoadCount {
-  season: number;
+  season: number | null;
   loaded: number;
   rejected: number;
 }

@@ -6,6 +6,7 @@ import {
   listAbsences,
   mergeIndex,
   weekFileName,
+  weeksToRefresh,
   type GameInputs,
 } from "../../src/dashboard/build";
 import type { BacktestPrediction } from "../../src/types/eval";
@@ -167,6 +168,26 @@ describe("dashboard/build", () => {
         [4, "t"],
       ]);
       expect(merged.record).toBe("record.json");
+    });
+  });
+
+  describe("weeksToRefresh", () => {
+    const at = (week: number, played: boolean): WeekGame => ({ ...game, gameId: `g${week}${played}`, week, homeScore: played ? 20 : null, awayScore: played ? 17 : null });
+
+    it("returns the latest completed week and the next week to play", () => {
+      expect(weeksToRefresh([at(1, true), at(2, true), at(3, false), at(4, false)], 2025)).toEqual([2, 3]);
+    });
+
+    it("returns only the first week before the season starts", () => {
+      expect(weeksToRefresh([at(1, false), at(2, false)], 2025)).toEqual([1]);
+    });
+
+    it("returns only the last week once the season is over", () => {
+      expect(weeksToRefresh([at(21, true), at(22, true)], 2025)).toEqual([22]);
+    });
+
+    it("ignores other seasons", () => {
+      expect(weeksToRefresh([{ ...at(5, false), season: 2024 }], 2025)).toEqual([]);
     });
   });
 

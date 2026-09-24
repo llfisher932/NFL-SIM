@@ -42,6 +42,11 @@ export function parseWeeks(input: string | undefined): number[] {
   return [...new Set(weeks)].sort((x, y) => x - y);
 }
 
+// NFL seasons run September to February, so January and February belong to the previous year.
+export function currentSeason(now: Date): number {
+  return now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear();
+}
+
 export function parseSeason(input: string | undefined): number {
   if (input === undefined) throw new Error("missing season");
   return seasonSchema.parse(input);

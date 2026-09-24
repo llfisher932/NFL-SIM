@@ -3,7 +3,7 @@ import { DEFAULT_SIM_CONFIG } from "../../src/sim/config";
 import type { DriveModel } from "../../src/sim/driveModel";
 import { matchupEpa, simulateGame } from "../../src/sim/game";
 import { createRng } from "../../src/sim/rng";
-import { DRIVE_OUTCOMES, type DriveOutcome, type Matchup } from "../../src/types/sim";
+import { DRIVE_OUTCOMES, type DriveOutcome, type GameState, type Matchup } from "../../src/types/sim";
 
 const DRIVE_STATS = {
   passAttempts: 4,
@@ -20,17 +20,19 @@ const DRIVE_STATS = {
 interface StubLog {
   offenseMatchups: number[];
   paceScales: number[];
+  states: GameState[];
 }
 
 function scriptedModel(script: (drive: number) => DriveOutcome, durationSeconds = 150): DriveModel & StubLog {
   let drive = 0;
-  const log: StubLog = { offenseMatchups: [], paceScales: [] };
+  const log: StubLog = { offenseMatchups: [], paceScales: [], states: [] };
   return {
     ...log,
     trainingDrives: 0,
     outcomeModel: { classes: 0, features: 0, coefficients: [] },
-    outcomeProbabilities: (_start, matchup) => {
+    outcomeProbabilities: (_start, matchup, _clock, state) => {
       log.offenseMatchups.push(matchup);
+      log.states.push(state);
       const outcome = script(drive++);
       return DRIVE_OUTCOMES.map((o) => (o === outcome ? 1 : 0));
     },
@@ -113,6 +115,26 @@ describe("sim/game", () => {
       it("adds nothing when no end-of-half template fits the clock", () => {
         const result = simulateGame(scriptedModel(() => "end_of_half", 5000), evenMatchup, config, createRng(1));
         expect(result.homeStats.passAttempts + result.awayStats.passAttempts).toBe(0);
+      });
+    });
+
+    describe("game state", () => {
+      it("starts the game level with the full clock", () => {
+        const model = scriptedModel(() => "punt");
+        simulateGame(model, evenMatchup, config, createRng(1));
+        expect(model.states[0]).toEqual({ scoreDiff: 0, gameSecondsLeft: 3600 });
+      });
+
+      it("shows the next offense trailing after a touchdown", () => {
+        const model = scriptedModel((i) => (i === 0 ? "touchdown" : "punt"));
+        simulateGame(model, evenMatchup, config, createRng(1));
+        expect(model.states[1]!.scoreDiff).toBe(-7);
+      });
+
+      it("counts the second half in game seconds without the first half", () => {
+        const model = scriptedModel(() => "punt", 150);
+        simulateGame(model, evenMatchup, config, createRng(1));
+        expect(model.states[12]!.gameSecondsLeft).toBe(1800);
       });
     });
 

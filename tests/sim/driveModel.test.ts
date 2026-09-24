@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { driveFeatures, fitDriveModel, timeBand, trainingWindow } from "../../src/sim/driveModel";
+import { driveFeatures, fitDriveModel, leadState, NEUTRAL_STATE, timeBand, trainingWindow } from "../../src/sim/driveModel";
 import { createRng } from "../../src/sim/rng";
 import { DRIVE_OUTCOMES, type DriveRecord } from "../../src/types/sim";
 import { conversions, fixedRatings, syntheticDrives, testSimConfig } from "../fixtures/drives";
@@ -20,7 +20,7 @@ function fingerprint(model: ReturnType<typeof fitDriveModel>): unknown {
     trainingDrives: model.trainingDrives,
     coefficients: model.outcomeModel.coefficients,
     draws: Array.from({ length: 200 }, (_, i) => [
-      model.sampleDrive(DRIVE_OUTCOMES[i % DRIVE_OUTCOMES.length]!, 20 + (i % 70), 1800 - i * 7, 1, rng),
+      model.sampleDrive(DRIVE_OUTCOMES[i % DRIVE_OUTCOMES.length]!, 20 + (i % 70), 1800 - i * 7, 1, rng, NEUTRAL_STATE),
       model.sampleNextStart("punt", 30 + (i % 60), rng),
       model.sampleKickoffStart(rng),
       model.sampleTouchdownPoints(rng),
@@ -31,16 +31,45 @@ function fingerprint(model: ReturnType<typeof fitDriveModel>): unknown {
 describe("sim/driveModel", () => {
   describe("driveFeatures", () => {
     it("scales field position to [0, 1] with a squared term", () => {
-      expect(driveFeatures(75, 0, 1800).slice(0, 3)).toEqual([1, 0.75, 0.5625]);
+      expect(driveFeatures(75, 0, 1800, NEUTRAL_STATE).slice(0, 3)).toEqual([1, 0.75, 0.5625]);
     });
 
     it("leaves every clock feature at zero with more than ten minutes left", () => {
-      expect(driveFeatures(75, 0, 900).slice(4)).toEqual([0, 0, 0, 0]);
+      expect(driveFeatures(75, 0, 900, NEUTRAL_STATE).slice(4, 8)).toEqual([0, 0, 0, 0]);
     });
 
     it("turns on every clock feature in the final seconds", () => {
-      const clock = driveFeatures(75, 0, 10).slice(4);
+      const clock = driveFeatures(75, 0, 10, NEUTRAL_STATE).slice(4, 8);
       expect(clock.every((v) => v > 0)).toBe(true);
+    });
+  });
+
+  describe("game-state features", () => {
+    it("are zero at kickoff regardless of score", () => {
+      expect(driveFeatures(75, 0, 1800, { scoreDiff: 14, gameSecondsLeft: 3600 }).slice(8)).toEqual([0, 0, 0]);
+    });
+
+    it("carry the sign of the lead late in the game", () => {
+      const [trail] = driveFeatures(75, 0, 300, { scoreDiff: -14, gameSecondsLeft: 300 }).slice(8);
+      const [lead] = driveFeatures(75, 0, 300, { scoreDiff: 14, gameSecondsLeft: 300 }).slice(8);
+      expect(trail!).toBeLessThan(0);
+      expect(lead!).toBeGreaterThan(0);
+    });
+
+    it("cap the lead at three scores", () => {
+      expect(driveFeatures(75, 0, 300, { scoreDiff: 40, gameSecondsLeft: 0 })[8]).toBe(1);
+    });
+  });
+
+  describe("leadState", () => {
+    it("ignores the score before the final 20 minutes", () => {
+      expect(leadState({ scoreDiff: 21, gameSecondsLeft: 1500 })).toBe("early");
+    });
+
+    it("classifies two-score margins late", () => {
+      expect(leadState({ scoreDiff: -10, gameSecondsLeft: 600 })).toBe("trailing");
+      expect(leadState({ scoreDiff: 9, gameSecondsLeft: 600 })).toBe("leading");
+      expect(leadState({ scoreDiff: 3, gameSecondsLeft: 600 })).toBe("close");
     });
   });
 
@@ -77,25 +106,25 @@ describe("sim/driveModel", () => {
 
     describe("outcome probabilities", () => {
       it("sum to one", () => {
-        const p = model.outcomeProbabilities(75, 0, 1200);
+        const p = model.outcomeProbabilities(75, 0, 1200, NEUTRAL_STATE);
         expect(p.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 10);
       });
 
       it("give a stronger matchup more touchdowns and fewer punts", () => {
-        const weak = model.outcomeProbabilities(75, -0.2, 1200);
-        const strong = model.outcomeProbabilities(75, 0.2, 1200);
+        const weak = model.outcomeProbabilities(75, -0.2, 1200, NEUTRAL_STATE);
+        const strong = model.outcomeProbabilities(75, 0.2, 1200, NEUTRAL_STATE);
         expect(strong[td]!).toBeGreaterThan(weak[td]!);
         expect(strong[punt]!).toBeLessThan(weak[punt]!);
       });
 
       it("give better field position more touchdowns", () => {
-        expect(model.outcomeProbabilities(30, 0, 1200)[td]!).toBeGreaterThan(
-          model.outcomeProbabilities(85, 0, 1200)[td]!,
+        expect(model.outcomeProbabilities(30, 0, 1200, NEUTRAL_STATE)[td]!).toBeGreaterThan(
+          model.outcomeProbabilities(85, 0, 1200, NEUTRAL_STATE)[td]!,
         );
       });
 
       it("make end of half dominant with seconds left", () => {
-        expect(model.outcomeProbabilities(75, 0, 10)[endOfHalf]!).toBeGreaterThan(0.5);
+        expect(model.outcomeProbabilities(75, 0, 10, NEUTRAL_STATE)[endOfHalf]!).toBeGreaterThan(0.5);
       });
     });
 
@@ -103,7 +132,7 @@ describe("sim/driveModel", () => {
       it("returns a template that fits in the time left", () => {
         const rng = createRng(1);
         for (let i = 0; i < 200; i++) {
-          const drive = model.sampleDrive("punt", 70, 400, 1, rng);
+          const drive = model.sampleDrive("punt", 70, 400, 1, rng, NEUTRAL_STATE);
           if (drive) expect(drive.durationSeconds).toBeLessThanOrEqual(400);
         }
       });
@@ -111,13 +140,13 @@ describe("sim/driveModel", () => {
       it("accounts for pace when checking the time left", () => {
         const rng = createRng(1);
         for (let i = 0; i < 200; i++) {
-          const drive = model.sampleDrive("punt", 70, 400, 2, rng);
+          const drive = model.sampleDrive("punt", 70, 400, 2, rng, NEUTRAL_STATE);
           if (drive) expect(drive.durationSeconds * 2).toBeLessThanOrEqual(400);
         }
       });
 
       it("returns null when no template can fit", () => {
-        expect(model.sampleDrive("touchdown", 70, 1, 1, createRng(1))).toBeNull();
+        expect(model.sampleDrive("touchdown", 70, 1, 1, createRng(1), NEUTRAL_STATE)).toBeNull();
       });
     });
 

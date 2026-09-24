@@ -117,6 +117,18 @@ export function buildDashboardGame(inputs: GameInputs): DashboardGame {
   };
 }
 
+// The latest week with a final score and the earliest week still to be played.
+export function weeksToRefresh(games: readonly WeekGame[], season: number): number[] {
+  const inSeason = games.filter((g) => g.season === season);
+  const played = inSeason.filter((g) => g.homeScore !== null).map((g) => g.week);
+  const upcoming = inSeason.filter((g) => g.homeScore === null).map((g) => g.week);
+  const weeks = [
+    ...(played.length > 0 ? [Math.max(...played)] : []),
+    ...(upcoming.length > 0 ? [Math.min(...upcoming)] : []),
+  ];
+  return [...new Set(weeks)].sort((a, b) => a - b);
+}
+
 export const weekFileName = (season: number, week: number) =>
   `week-${season}-${String(week).padStart(2, "0")}.json`;
 

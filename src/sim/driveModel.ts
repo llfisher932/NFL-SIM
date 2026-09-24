@@ -6,6 +6,7 @@ import {
   type ConversionCount,
   type DriveOutcome,
   type DriveRecord,
+  type GameState,
   type SimConfig,
   type TeamGameStats,
 } from "../types/sim";
@@ -24,13 +25,14 @@ export interface DriveTemplate {
 export interface DriveModel {
   trainingDrives: number;
   outcomeModel: MultinomialModel;
-  outcomeProbabilities(startYardline: number, matchupEpa: number, secondsLeft: number): number[];
+  outcomeProbabilities(startYardline: number, matchupEpa: number, secondsLeft: number, state: GameState): number[];
   sampleDrive(
     outcome: DriveOutcome,
     startYardline: number,
     secondsLeft: number,
     paceScale: number,
     rng: Rng,
+    state: GameState,
   ): DriveTemplate | null;
   sampleNextStart(outcome: DriveOutcome, endYardline: number, rng: Rng): number;
   sampleKickoffStart(rng: Rng): number;
@@ -46,8 +48,24 @@ export function timeBand(secondsLeft: number): number {
 }
 const MATCHUP_SCALE = 10;
 
-export function driveFeatures(startYardline: number, matchupEpa: number, secondsLeft: number): number[] {
+export const NEUTRAL_STATE: GameState = { scoreDiff: 0, gameSecondsLeft: 3600 };
+const LEAD_SCALE = 24;
+const LATE_GAME_SECONDS = 1200;
+const BIG_LEAD = 9;
+
+export type LeadState = "early" | "trailing" | "close" | "leading";
+
+export function leadState(state: GameState): LeadState {
+  if (state.gameSecondsLeft > LATE_GAME_SECONDS) return "early";
+  if (state.scoreDiff <= -BIG_LEAD) return "trailing";
+  if (state.scoreDiff >= BIG_LEAD) return "leading";
+  return "close";
+}
+
+export function driveFeatures(startYardline: number, matchupEpa: number, secondsLeft: number, state: GameState): number[] {
   const fieldPosition = startYardline / 100;
+  const lead = Math.max(-1, Math.min(1, state.scoreDiff / LEAD_SCALE));
+  const elapsed = 1 - Math.max(0, Math.min(3600, state.gameSecondsLeft)) / 3600;
   return [
     1,
     fieldPosition,
@@ -57,6 +75,9 @@ export function driveFeatures(startYardline: number, matchupEpa: number, seconds
     Math.max(0, 300 - secondsLeft) / 300,
     Math.max(0, 600 - secondsLeft) / 600,
     secondsLeft <= 30 ? 1 : 0,
+    lead * elapsed,
+    lead * elapsed * elapsed,
+    Math.abs(lead) * elapsed,
   ];
 }
 
@@ -90,7 +111,7 @@ export function fitDriveModel(
     return ratings(at, d.offense).offense + ratings(at, d.defense).defense;
   };
   const outcomeModel = fitMultinomial(
-    training.map((d) => driveFeatures(d.startYardline, matchupOf(d), d.startSeconds)),
+    training.map((d) => driveFeatures(d.startYardline, matchupOf(d), d.startSeconds, d)),
     training.map((d) => DRIVE_OUTCOMES.indexOf(d.outcome)),
     DRIVE_OUTCOMES.length,
     { l2: config.l2 },
@@ -107,15 +128,22 @@ export function fitDriveModel(
       })),
       config.neighbors,
     );
+  const LEAD_STATES: LeadState[] = ["early", "trailing", "close", "leading"];
   const templates = byOutcome((outcome) => {
     const ofOutcome = training.filter((d) => d.outcome === outcome);
     const all = templateSampler(ofOutcome);
-    const banded = TIME_BAND_UPPER_BOUNDS.map((_, band) =>
-      templateSampler(ofOutcome.filter((d) => timeBand(d.startSeconds) === band)),
-    );
-    return (secondsLeft: number) => {
-      const sampler = banded[timeBand(secondsLeft)]!;
-      return sampler.size >= config.neighbors ? sampler : all;
+    const banded = TIME_BAND_UPPER_BOUNDS.map((_, band) => {
+      const inBand = ofOutcome.filter((d) => timeBand(d.startSeconds) === band);
+      return {
+        any: templateSampler(inBand),
+        byLead: new Map(LEAD_STATES.map((s) => [s, templateSampler(inBand.filter((d) => leadState(d) === s))])),
+      };
+    });
+    return (secondsLeft: number, state: GameState) => {
+      const band = banded[timeBand(secondsLeft)]!;
+      const byLead = band.byLead.get(leadState(state))!;
+      if (byLead.size >= config.neighbors) return byLead;
+      return band.any.size >= config.neighbors ? band.any : all;
     };
   });
   const transitions: Record<DriveOutcome, NearestSampler<number>> = byOutcome((outcome) =>
@@ -151,10 +179,10 @@ export function fitDriveModel(
   return {
     trainingDrives: training.length,
     outcomeModel,
-    outcomeProbabilities: (startYardline, matchupEpa, secondsLeft) =>
-      softmaxProbabilities(outcomeModel, driveFeatures(startYardline, matchupEpa, secondsLeft)),
-    sampleDrive: (outcome, startYardline, secondsLeft, paceScale, rng) => {
-      const sampler = templates[outcome](secondsLeft);
+    outcomeProbabilities: (startYardline, matchupEpa, secondsLeft, state) =>
+      softmaxProbabilities(outcomeModel, driveFeatures(startYardline, matchupEpa, secondsLeft, state)),
+    sampleDrive: (outcome, startYardline, secondsLeft, paceScale, rng, state) => {
+      const sampler = templates[outcome](secondsLeft, state);
       const maxSeconds = secondsLeft / paceScale;
       if (sampler.size === 0) {
         const fallback = {

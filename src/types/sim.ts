@@ -52,6 +52,14 @@ export interface DriveRecord extends SeasonWeek {
   durationSeconds: number;
   nextStartYardline: number | null;
   stats: TeamGameStats;
+  scoreDiff: number;
+  gameSecondsLeft: number;
+}
+
+// Offense's lead and the game clock at the start of a drive.
+export interface GameState {
+  scoreDiff: number;
+  gameSecondsLeft: number;
 }
 
 export interface ConversionCount extends SeasonWeek {

@@ -40,6 +40,8 @@ interface PeriodRules {
   seconds: number;
   firstOffense: Side;
   suddenDeath: boolean;
+  // Game seconds that remain after this period ends (1800 for the first half, 0 otherwise).
+  secondsAfter: number;
 }
 
 export function matchupEpa(matchup: Matchup, offense: Side, homeFieldEpa: number): number {
@@ -70,9 +72,10 @@ function playPeriod(
     state.drives++;
     possessed[offense] = true;
     const defense = other(offense);
-    const probabilities = model.outcomeProbabilities(start, matchupEpa(matchup, offense, config.homeFieldEpa), clock);
+    const gameState = { scoreDiff: state.score[offense] - state.score[defense], gameSecondsLeft: clock + rules.secondsAfter };
+    const probabilities = model.outcomeProbabilities(start, matchupEpa(matchup, offense, config.homeFieldEpa), clock, gameState);
     const outcome = DRIVE_OUTCOMES[sampleIndex(probabilities, rng)]!;
-    const drive = model.sampleDrive(outcome, start, clock, paceScale[offense], rng);
+    const drive = model.sampleDrive(outcome, start, clock, paceScale[offense], rng, gameState);
     if (outcome === "end_of_half") {
       if (drive) state.stats[offense] = addStats(state.stats[offense], drive.stats);
       return;
@@ -117,13 +120,20 @@ function playPeriod(
 export function simulateGame(model: DriveModel, matchup: Matchup, config: SimConfig, rng: Rng): GameResult {
   const state: GameState = { score: { home: 0, away: 0 }, stats: { home: EMPTY_STATS, away: EMPTY_STATS }, drives: 0 };
   const openingReceiver: Side = rng.next() < 0.5 ? "home" : "away";
-  playPeriod(model, matchup, config, state, { seconds: HALF_SECONDS, firstOffense: openingReceiver, suddenDeath: false }, rng);
   playPeriod(
     model,
     matchup,
     config,
     state,
-    { seconds: HALF_SECONDS, firstOffense: other(openingReceiver), suddenDeath: false },
+    { seconds: HALF_SECONDS, firstOffense: openingReceiver, suddenDeath: false, secondsAfter: HALF_SECONDS },
+    rng,
+  );
+  playPeriod(
+    model,
+    matchup,
+    config,
+    state,
+    { seconds: HALF_SECONDS, firstOffense: other(openingReceiver), suddenDeath: false, secondsAfter: 0 },
     rng,
   );
 
@@ -140,6 +150,7 @@ export function simulateGame(model: DriveModel, matchup: Matchup, config: SimCon
         seconds: matchup.postseason ? config.overtimeSeconds.postseason : config.overtimeSeconds.regular,
         firstOffense: rng.next() < 0.5 ? "home" : "away",
         suddenDeath: true,
+        secondsAfter: 0,
       },
       rng,
     );

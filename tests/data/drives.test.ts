@@ -32,6 +32,12 @@ describe("data/drives", () => {
           ('G', 2024, 5, 13, NULL, NULL, NULL, 'Half1', NULL, 0, NULL, NULL, NULL)
         ) AS t(game_id, season, week, play_id, fixed_drive, posteam, defteam, game_half,
                yardline_100, half_seconds_remaining, down, fixed_drive_result, play_type)`);
+      await db.connection.run(
+        "ALTER TABLE plays ADD COLUMN game_seconds_remaining DOUBLE; " +
+          "UPDATE plays SET game_seconds_remaining = half_seconds_remaining + CASE WHEN game_half = 'Half1' THEN 1800 ELSE 0 END; " +
+          "ALTER TABLE plays ADD COLUMN score_differential DOUBLE; " +
+          "UPDATE plays SET score_differential = CASE WHEN posteam = 'KC' THEN -7 ELSE 0 END",
+      );
       await db.connection.run(`
         CREATE TABLE box AS SELECT * FROM (VALUES
           (2, 1, 0, 0, 1, 25, 0, 0, 'WR1', 0, NULL, 0),
@@ -97,6 +103,10 @@ describe("data/drives", () => {
         rushTds: 0,
       });
       expect((await find("KC", "punt")).stats.passAttempts).toBe(0);
+    });
+
+    it("records the offense's lead and the game clock at the drive's start", async () => {
+      expect(await find("KC", "punt")).toMatchObject({ scoreDiff: -7, gameSecondsLeft: 1590 + 1800 });
     });
 
     it("counts kneels as carries", async () => {

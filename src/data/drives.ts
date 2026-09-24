@@ -55,6 +55,8 @@ export async function loadDrives(connection: DuckDBConnection): Promise<DriveRec
          arg_min(yardline_100, play_id) FILTER (down IS NOT NULL) AS start_yardline,
          arg_max(yardline_100, play_id) FILTER (down IS NOT NULL) AS end_yardline,
          max(half_seconds_remaining) AS start_seconds,
+         max(game_seconds_remaining) AS start_game_seconds,
+         arg_min(score_differential, play_id) FILTER (down IS NOT NULL) AS start_score_diff,
          any_value(fixed_drive_result) AS result,
          ${DRIVE_STAT_COLUMNS}
        FROM pbp
@@ -70,7 +72,7 @@ export async function loadDrives(connection: DuckDBConnection): Promise<DriveRec
      )
      SELECT game_id, season, week, game_half, offense, defense, start_yardline, end_yardline,
        start_seconds, start_seconds - coalesce(next_start_seconds, 0) AS duration_seconds,
-       result, next_start_yardline,
+       result, next_start_yardline, start_game_seconds, start_score_diff,
        pass_attempts, completions, pass_yards, pass_tds, interceptions, targets, carries, rush_yards, rush_tds
      FROM sequenced
      WHERE game_half IN ('Half1', 'Half2') AND offense IS NOT NULL AND result IS NOT NULL
@@ -96,6 +98,8 @@ export async function loadDrives(connection: DuckDBConnection): Promise<DriveRec
         durationSeconds: Math.max(0, Number(row["duration_seconds"])),
         nextStartYardline: next === null ? null : Number(next),
         stats: driveStats(row),
+        scoreDiff: Number(row["start_score_diff"] ?? 0),
+        gameSecondsLeft: Number(row["start_game_seconds"] ?? 0),
       },
     ];
   });

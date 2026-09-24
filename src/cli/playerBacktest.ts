@@ -27,6 +27,7 @@ const { values } = parseArgs({
     "target-cv": { type: "string", default: String(DEFAULT_PLAYER_CONFIG.shareVolatility.targets) },
     "carry-cv": { type: "string", default: String(DEFAULT_PLAYER_CONFIG.shareVolatility.carries) },
     "rush-yards-cv": { type: "string", default: String(DEFAULT_PLAYER_CONFIG.yardsCv.rushing) },
+    "rec-yards-cv": { type: "string", default: String(DEFAULT_PLAYER_CONFIG.yardsCv.receiving) },
     "no-injuries": { type: "boolean", default: false },
     db: { type: "string", default: DEFAULT_DB_PATH },
   },
@@ -56,7 +57,7 @@ async function main(): Promise<void> {
   const playerConfig = {
     ...DEFAULT_PLAYER_CONFIG,
     shareVolatility: { targets: Number(values["target-cv"]), carries: Number(values["carry-cv"]) },
-    yardsCv: { ...DEFAULT_PLAYER_CONFIG.yardsCv, rushing: Number(values["rush-yards-cv"]) },
+    yardsCv: { receiving: Number(values["rec-yards-cv"]), rushing: Number(values["rush-yards-cv"]) },
   };
   const overrides = await loadOverrides(values.overrides);
 

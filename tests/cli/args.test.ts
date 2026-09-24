@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cliErrorMessage,
+  currentSeason,
   parseHalfLife,
   parseHfa,
   parseSeason,
@@ -67,6 +68,16 @@ describe("cli/args", () => {
 
     it("rejects a missing value", () => {
       expect(() => parseWeek(undefined)).toThrow("missing week");
+    });
+  });
+
+  describe("currentSeason", () => {
+    it("uses the calendar year from March on", () => {
+      expect(currentSeason(new Date(2026, 8, 24))).toBe(2026);
+    });
+
+    it("assigns January and February to the previous season", () => {
+      expect(currentSeason(new Date(2027, 1, 10))).toBe(2026);
     });
   });
 

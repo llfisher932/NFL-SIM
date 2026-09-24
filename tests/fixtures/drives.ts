@@ -53,6 +53,8 @@ export function syntheticDrives(seasons: readonly number[], weeks: number, seed 
           outcome,
           durationSeconds: Math.max(5, Math.min(startSeconds, 60 + Math.floor(random() * 240))),
           nextStartYardline: outcome === "end_of_half" ? null : 60 + Math.floor(random() * 20),
+          scoreDiff: 0,
+          gameSecondsLeft: startSeconds + (startSeconds % 2 === 0 ? 1800 : 0),
           stats: {
             passAttempts: 3,
             completions: 2,

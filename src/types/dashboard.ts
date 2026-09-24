@@ -63,6 +63,8 @@ export interface DashboardGame {
   final: { home: number; away: number } | null;
   // The model's picks here that fall into its historically strongest situations.
   spots?: SituationPick[] | undefined;
+  // Weight on the model when blending with Vegas for realistic bet probabilities (the rest is Vegas).
+  pricing?: { marginWeight: number; totalWeight: number } | undefined;
   players: DashboardPlayer[];
 }
 

@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { GameCard, modelPickCorrect } from "../src/components/GameCard";
+import { BetCalculator } from "../src/components/BetCalculator";
 import { GameDetail } from "../src/components/GameDetail";
 import { PlayersView } from "../src/components/PlayersView";
 import { RecordView } from "../src/components/RecordView";
@@ -141,6 +142,34 @@ describe("web/components", () => {
     it("renders each team's player projections", () => {
       expect(html).toContain("Matthew Stafford");
       expect(html).toContain("Test Back");
+    });
+  });
+
+  describe("BetCalculator", () => {
+    const priced = game({ pricing: { marginWeight: 0.15, totalWeight: 0 } });
+    const html = text(renderToStaticMarkup(<BetCalculator game={priced} />));
+
+    it("opens on the model's side of the spread at the Vegas line", () => {
+      expect(html).toContain("Bet calculator");
+      expect(html).toContain("Win");
+      expect(html).toContain("Fair price");
+    });
+
+    it("explains how realistic odds blend the model with Vegas", () => {
+      expect(html).toContain("mix 15% model with 85% Vegas for margins and 0% model for totals");
+    });
+
+    it("shows the raw model's chance next to the realistic one", () => {
+      expect(html).toContain("Raw model alone:");
+    });
+
+    it("offers a table of alternative lines", () => {
+      expect(html).toContain("Alternative lines");
+    });
+
+    it("reports expected value at the default price", () => {
+      expect(html).toContain("Expected value");
+      expect(html).toContain("per $100");
     });
   });
 

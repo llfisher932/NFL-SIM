@@ -3,6 +3,7 @@ import type { DashboardGame, DashboardTeam } from "../../../src/types/dashboard"
 import { bucketize, cropBins, histogramBins, marginBuckets, TOTAL_BUCKETS, type BucketRow } from "../lib/chart";
 import { fixed, kickoffLabel, lineLabel, marginLabel, pct, signed } from "../lib/format";
 import { resultLabel, spotHistory } from "../lib/spots";
+import { BetCalculator } from "./BetCalculator";
 import { formatHash } from "../lib/route";
 import { teamName, teamNickname } from "../lib/teams";
 import { ChartFrame } from "./ChartFrame";
@@ -216,6 +217,8 @@ export function GameDetail({ game }: { game: DashboardGame }) {
           </div>
         )}
       </div>
+
+      <BetCalculator key={game.gameId} game={game} />
 
       <div className="two-col">
         <ChartFrame

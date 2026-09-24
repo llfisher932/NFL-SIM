@@ -1,3 +1,4 @@
+import { gameWeights, type BlendWeights } from "../eval/blend";
 import { gameSituations, situationRecords } from "../eval/situations";
 import type { SituationId, SituationRecord } from "../types/situations";
 import type { TrackerReport } from "../types/tracker";
@@ -32,6 +33,7 @@ export interface GameInputs {
   absences: { home: TeamAbsence | undefined; away: TeamAbsence | undefined };
   names: ReadonlyMap<string, string>;
   situations?: ReadonlyMap<SituationId, SituationRecord>;
+  blend?: BlendWeights;
 }
 
 const netRating = (f: TeamWeekFeatures) => f.offense.all - f.defense.all;
@@ -127,6 +129,11 @@ export function buildDashboardGame(inputs: GameInputs): DashboardGame {
           },
           final,
           inputs.situations,
+        )
+      : undefined,
+    pricing: inputs.blend
+      ? (({ margin, total }) => ({ marginWeight: margin, totalWeight: total }))(
+          gameWeights(inputs.blend, game.week, game.gameType !== "REG"),
         )
       : undefined,
     vegas: {

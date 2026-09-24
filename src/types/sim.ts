@@ -42,6 +42,8 @@ export interface WeekGame extends SeasonWeek {
   neutralSite: boolean;
   spreadLine: number | null;
   totalLine: number | null;
+  homeMoneyline: number | null;
+  awayMoneyline: number | null;
   homeScore: number | null;
   awayScore: number | null;
 }

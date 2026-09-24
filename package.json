@@ -6,6 +6,8 @@
     "ingest": "tsx src/cli/ingest.ts",
     "features": "tsx src/cli/features.ts",
     "sim": "tsx src/cli/sim.ts",
+    "backtest": "tsx src/cli/backtest.ts",
+    "tune": "tsx src/cli/tune.ts",
     "epa": "tsx src/cli/epa.ts",
     "test": "vitest run",
     "test:watch": "vitest",

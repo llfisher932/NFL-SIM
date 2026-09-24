@@ -6,7 +6,7 @@ import { DEFAULT_FEATURE_CONFIG } from "../features/config";
 import { createFeatureModel } from "../features/teamFeatures";
 import { DEFAULT_SEED, DEFAULT_SIM_CONFIG, DEFAULT_SIMS } from "../sim/config";
 import { fitDriveModel } from "../sim/driveModel";
-import { buildMatchup, createWeekFeatureCache, ratingLookupFrom } from "../sim/matchups";
+import { buildMatchup, createWeekFeatureCache, ratingLookupFrom, teamsBySeason } from "../sim/matchups";
 import { projectGame } from "../sim/monteCarlo";
 import { hashSeed } from "../sim/rng";
 import { cliErrorMessage, parseHfa, parseSeason, parseSeed, parseSims, parseWeek } from "./args";
@@ -47,16 +47,10 @@ async function main(): Promise<void> {
   })();
   if (games.length === 0) throw new Error(`no games scheduled for ${target.season} week ${target.week}`);
 
-  const teamsBySeason = new Map<number, string[]>();
-  for (const g of teamGames) {
-    const teams = teamsBySeason.get(g.season) ?? [];
-    if (!teams.includes(g.team)) teams.push(g.team);
-    teamsBySeason.set(g.season, teams);
-  }
-  const scheduled = new Set([...(teamsBySeason.get(target.season) ?? []), ...games.flatMap((g) => [g.home, g.away])]);
-  teamsBySeason.set(target.season, [...scheduled]);
-
-  const weekFeatures = createWeekFeatureCache(createFeatureModel(teamGames, DEFAULT_FEATURE_CONFIG), teamsBySeason);
+  const weekFeatures = createWeekFeatureCache(
+    createFeatureModel(teamGames, DEFAULT_FEATURE_CONFIG),
+    teamsBySeason(teamGames, games),
+  );
   const model = fitDriveModel(drives, conversions, target, ratingLookupFrom(weekFeatures), config);
   const features = weekFeatures(target);
 

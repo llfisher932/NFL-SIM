@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { FeatureModel } from "../../src/features/teamFeatures";
-import { buildMatchup, createWeekFeatureCache, ratingLookupFrom } from "../../src/sim/matchups";
+import { buildMatchup, createWeekFeatureCache, ratingLookupFrom, teamsBySeason } from "../../src/sim/matchups";
 import type { TeamWeekFeatures } from "../../src/types/features";
 import type { WeekGame } from "../../src/types/sim";
 
@@ -33,6 +33,8 @@ const game: WeekGame = {
   neutralSite: false,
   spreadLine: 8.5,
   totalLine: 43.5,
+  homeMoneyline: -400,
+  awayMoneyline: 310,
   homeScore: null,
   awayScore: null,
 };
@@ -84,6 +86,22 @@ describe("sim/matchups", () => {
     it("returns the overall offense and defense ratings", () => {
       const lookup = ratingLookupFrom(() => week);
       expect(lookup({ season: 2025, week: 5 }, "SF")).toEqual({ offense: 0.04, defense: 0.03 });
+    });
+  });
+
+  describe("teamsBySeason", () => {
+    it("merges teams that played with teams on the schedule, sorted per season", () => {
+      const result = teamsBySeason(
+        [
+          { season: 2025, team: "SF" },
+          { season: 2024, team: "KC" },
+        ],
+        [game, { ...game, season: 2024, home: "BUF", away: "KC" }],
+      );
+      expect([...result]).toEqual([
+        [2025, ["LA", "SF"]],
+        [2024, ["BUF", "KC"]],
+      ]);
     });
   });
 });

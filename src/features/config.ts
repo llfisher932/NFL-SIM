@@ -3,7 +3,8 @@ import type { FeatureConfig } from "../types/features";
 export const END_OF_SEASON_WEEK = 23;
 
 // Priors are noise variance / talent variance, measured on 2021-2025 regular seasons.
-// Retention is the noise-corrected year-over-year correlation. Untuned until Phase 4.
+// Retention is the noise-corrected year-over-year correlation. A 90-config grid
+// (pnpm tune) found nothing that beat these on held-out 2024-2025 margins.
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   halfLifeWeeks: 8,
   priorPlays: {

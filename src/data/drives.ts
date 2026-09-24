@@ -89,17 +89,17 @@ export async function loadConversionCounts(connection: DuckDBConnection): Promis
   }));
 }
 
-export async function loadWeekGames(
+const GAME_COLUMNS = `game_id, season, week, game_type, home_team, away_team, location,
+  spread_line, total_line, home_moneyline, away_moneyline, home_score, away_score`;
+
+async function loadGames(
   connection: DuckDBConnection,
-  season: number,
-  week: number,
+  where: string,
+  params: Record<string, number>,
 ): Promise<WeekGame[]> {
   const reader = await connection.runAndReadAll(
-    `SELECT game_id, season, week, game_type, home_team, away_team, location,
-       spread_line, total_line, home_score, away_score
-     FROM schedules WHERE season = $season AND week = $week
-     ORDER BY gameday, gametime, game_id`,
-    { season, week },
+    `SELECT ${GAME_COLUMNS} FROM schedules WHERE ${where} ORDER BY season, week, gameday, gametime, game_id`,
+    params,
   );
   const nullableNumber = (value: unknown) => (value === null ? null : Number(value));
   return reader.getRowObjectsJS().map((row) => ({
@@ -112,7 +112,18 @@ export async function loadWeekGames(
     neutralSite: row["location"] === "Neutral",
     spreadLine: nullableNumber(row["spread_line"]),
     totalLine: nullableNumber(row["total_line"]),
+    homeMoneyline: nullableNumber(row["home_moneyline"]),
+    awayMoneyline: nullableNumber(row["away_moneyline"]),
     homeScore: nullableNumber(row["home_score"]),
     awayScore: nullableNumber(row["away_score"]),
   }));
+}
+
+export function loadWeekGames(connection: DuckDBConnection, season: number, week: number): Promise<WeekGame[]> {
+  return loadGames(connection, "season = $season AND week = $week", { season, week });
+}
+
+export function loadSeasonGames(connection: DuckDBConnection, seasons: readonly number[]): Promise<WeekGame[]> {
+  const list = seasons.map((s) => Math.trunc(s)).join(", ");
+  return loadGames(connection, `season IN (${list})`, {});
 }

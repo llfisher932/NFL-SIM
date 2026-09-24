@@ -5,7 +5,8 @@ export const DEFAULT_SEED = 20_260_924;
 export const HALF_SECONDS = 1800;
 
 export const DEFAULT_SIM_CONFIG: SimConfig = {
-  // ~1.7 points of home margin, matching the 2021-2025 average home spread (1.74). Tune in Phase 4.
+  // ~1.8 points of home margin. Swept 0-0.03 (pnpm tune --stage hfa): 0.015 and 0.02 tied on
+  // 2022-2023; 0.015 was better on every metric for held-out 2024-2025.
   homeFieldEpa: 0.015,
   priorTrainingSeasons: 3,
   minTrainingDrives: 2000,

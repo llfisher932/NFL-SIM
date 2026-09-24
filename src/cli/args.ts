@@ -46,6 +46,35 @@ export function parseHalfLife(input: string): number {
   return halfLifeSchema.parse(input);
 }
 
+const simsSchema = z.coerce
+  .number({ error: "invalid sims" })
+  .int("invalid sims")
+  .min(1, "invalid sims")
+  .max(1_000_000, "invalid sims");
+
+const seedSchema = z.coerce
+  .number({ error: "invalid seed" })
+  .int("invalid seed")
+  .min(0, "invalid seed")
+  .max(4_294_967_295, "invalid seed");
+
+const hfaSchema = z.coerce
+  .number({ error: "invalid home-field advantage" })
+  .min(-0.5, "invalid home-field advantage")
+  .max(0.5, "invalid home-field advantage");
+
+export function parseSims(input: string): number {
+  return simsSchema.parse(input);
+}
+
+export function parseSeed(input: string): number {
+  return seedSchema.parse(input);
+}
+
+export function parseHfa(input: string): number {
+  return hfaSchema.parse(input);
+}
+
 export function cliErrorMessage(err: unknown): string {
   if (err instanceof z.ZodError) return err.issues.map((issue) => issue.message).join("; ");
   return err instanceof Error ? err.message : String(err);

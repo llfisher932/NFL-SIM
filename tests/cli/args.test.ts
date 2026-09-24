@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { cliErrorMessage, parseHalfLife, parseSeason, parseSeasons, parseWeek } from "../../src/cli/args";
+import {
+  cliErrorMessage,
+  parseHalfLife,
+  parseHfa,
+  parseSeason,
+  parseSeasons,
+  parseSeed,
+  parseSims,
+  parseWeek,
+} from "../../src/cli/args";
 
 describe("cli/args", () => {
   describe("parseSeasons", () => {
@@ -71,6 +80,41 @@ describe("cli/args", () => {
 
     it("rejects non-numeric input", () => {
       expect(() => parseHalfLife("fast")).toThrow("invalid half-life");
+    });
+  });
+
+  describe("parseSims", () => {
+    it("parses a positive integer", () => {
+      expect(parseSims("10000")).toBe(10_000);
+    });
+
+    it("rejects zero", () => {
+      expect(() => parseSims("0")).toThrow("invalid sims");
+    });
+
+    it("rejects fractions", () => {
+      expect(() => parseSims("2.5")).toThrow("invalid sims");
+    });
+  });
+
+  describe("parseSeed", () => {
+    it("accepts any unsigned 32-bit integer", () => {
+      expect(parseSeed("4294967295")).toBe(4_294_967_295);
+    });
+
+    it("rejects negative seeds", () => {
+      expect(() => parseSeed("-1")).toThrow("invalid seed");
+    });
+  });
+
+  describe("parseHfa", () => {
+    it("accepts a small EPA/play shift, including zero", () => {
+      expect(parseHfa("0")).toBe(0);
+      expect(parseHfa("0.015")).toBe(0.015);
+    });
+
+    it("rejects implausibly large values", () => {
+      expect(() => parseHfa("2")).toThrow("invalid home-field advantage");
     });
   });
 

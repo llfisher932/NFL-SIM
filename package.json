@@ -5,6 +5,7 @@
   "scripts": {
     "ingest": "tsx src/cli/ingest.ts",
     "features": "tsx src/cli/features.ts",
+    "sim": "tsx src/cli/sim.ts",
     "epa": "tsx src/cli/epa.ts",
     "test": "vitest run",
     "test:watch": "vitest",

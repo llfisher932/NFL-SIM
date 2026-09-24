@@ -19,6 +19,9 @@ function LineTile({ title, lines }: { title: string; lines: TrackerLine[] }) {
     <div className="card tile">
       <div className="tile-label">{title}</div>
       <div className="tile-value">{record(all)}</div>
+      <div className="tile-sub">
+        {all.picks} picks logged, {all.wins + all.losses + all.pushes} graded
+      </div>
       {strong.map((l) => (
         <div className="tile-sub" key={l.minGap}>
           {l.minGap}+ pt disagreements: {record(l)}

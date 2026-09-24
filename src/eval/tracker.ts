@@ -81,6 +81,7 @@ export function trackPicks(snapshots: readonly PickSnapshot[], games: readonly W
         kickoff: game.kickoff,
         capturedAt: s.capturedAt,
         started,
+        postseason: game.gameType !== "REG",
         modelMargin: s.modelMargin,
         modelTotal: s.modelTotal,
         spread: linePick(s.modelMargin, s.spreadLine, game.spreadLine, final ? final.home - final.away : null, [s.home, s.away], started),

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { DashboardGame, DashboardTeam } from "../../../src/types/dashboard";
 import { bucketize, cropBins, histogramBins, marginBuckets, TOTAL_BUCKETS, type BucketRow } from "../lib/chart";
 import { fixed, kickoffLabel, lineLabel, marginLabel, pct, signed } from "../lib/format";
+import { resultLabel, spotHistory } from "../lib/spots";
 import { formatHash } from "../lib/route";
 import { teamName, teamNickname } from "../lib/teams";
 import { ChartFrame } from "./ChartFrame";
@@ -148,6 +149,30 @@ export function GameDetail({ game }: { game: DashboardGame }) {
           <WinBar away={away.team} home={home.team} awayProb={away.winProb} homeProb={home.winProb} large />
         </div>
       </section>
+
+      {(game.spots ?? []).length > 0 && (
+        <section className="card chart-card spots-card" aria-label="Why the model likes this game">
+          <div className="chart-head">
+            <div>
+              <h3>One of the model{"’"}s best spots</h3>
+              <p>This game fits situations where the model{"’"}s side of the line has done best since 2022.</p>
+            </div>
+          </div>
+          <ul className="spot-list">
+            {(game.spots ?? []).map((s) => (
+              <li key={s.situation}>
+                <strong>{s.label}</strong>
+                <div className="spot-line">
+                  <span>
+                    Model takes <strong>{s.bet}</strong>. {spotHistory(s)}.
+                  </span>
+                  {s.result && <span className={`status ${s.result === "win" ? "good" : "miss"}`}>{resultLabel(s.result)}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="tiles">
         <div className="card tile">

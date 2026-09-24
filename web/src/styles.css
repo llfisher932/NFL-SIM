@@ -472,6 +472,57 @@ main {
   white-space: nowrap;
 }
 
+.chip.spot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--focus) 60%, transparent);
+  color: var(--ink-2);
+}
+
+a.chip {
+  text-decoration: none;
+}
+
+a.chip:hover {
+  background: var(--wash);
+}
+
+.spots-card {
+  margin-bottom: 14px;
+}
+
+.spot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.spot-list li {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) 1fr;
+  gap: 4px 14px;
+  align-items: baseline;
+  font-size: 13.5px;
+}
+
+.spot-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+
+.situations td .muted {
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .spot-list li {
+    grid-template-columns: 1fr;
+  }
+}
+
 .chip b {
   font-weight: 600;
   color: var(--ink);

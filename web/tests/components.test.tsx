@@ -5,9 +5,23 @@ import { GameDetail } from "../src/components/GameDetail";
 import { PlayersView } from "../src/components/PlayersView";
 import { RecordView } from "../src/components/RecordView";
 import { Slate } from "../src/components/Slate";
+import type { SituationPick } from "../../src/types/situations";
 import { game, record, week } from "./fixtures";
 
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+const spot = (overrides: Partial<SituationPick> = {}): SituationPick => ({
+  situation: "disagree-3",
+  label: "3+ point disagreement",
+  market: "spread",
+  side: "SF",
+  line: 8.5,
+  bet: "SF +8.5",
+  gap: -4,
+  result: null,
+  record: { wins: 179, losses: 137, pushes: 0, seasons: 4, seasonsAboveBreakEven: 3, beatsVegas: false },
+  ...overrides,
+});
 
 describe("web/components", () => {
   describe("modelPickCorrect", () => {
@@ -50,12 +64,34 @@ describe("web/components", () => {
       expect(card).not.toContain("00-0000101");
     });
 
+    it("marks a game in one of the model's best spots with its pick", () => {
+      const card = text(renderToStaticMarkup(<GameCard game={game({ spots: [spot()] })} />));
+      expect(card).toContain("Model spot: SF +8.5");
+    });
+
+    it("shows whether a best-spot pick won once the game is final", () => {
+      const card = text(renderToStaticMarkup(<GameCard game={game({ spots: [spot({ result: "win" })] })} />));
+      expect(card).toContain("SF +8.5 (won)");
+    });
+
     it("reports the model pick result with a label, not color alone", () => {
       expect(text(html)).toContain("Model pick lost");
     });
   });
 
   describe("Slate", () => {
+    it("lists this week's best spots with their history", () => {
+      const slate = week({ games: [game({ spots: [spot()] }), game({ gameId: "x", spots: [] })] });
+      const html = text(renderToStaticMarkup(<Slate week={slate} refreshing={false} />));
+      expect(html).toContain("Model’s best spots this week");
+      expect(html).toContain("SF +8.5");
+      expect(html).toContain("179–137 (56.6%) since 2022, above break-even in 3 of 4 seasons");
+    });
+
+    it("says when no game fits a best spot", () => {
+      expect(text(renderToStaticMarkup(<Slate week={week()} refreshing={false} />))).toContain("No games fit those situations this week");
+    });
+
     it("renders every game and the week header", () => {
       const html = text(renderToStaticMarkup(<Slate week={week()} refreshing={false} />));
       expect(html).toContain("Week 5");
@@ -70,6 +106,18 @@ describe("web/components", () => {
     it("leads with the favorite's win probability", () => {
       expect(html).toContain("78%");
       expect(html).toContain("Rams win probability");
+    });
+
+    it("explains why a best-spot game stands out", () => {
+      const playoff = spot({
+        situation: "playoffs",
+        label: "Playoff game",
+        record: { wins: 31, losses: 21, pushes: 0, seasons: 4, seasonsAboveBreakEven: 3, beatsVegas: true },
+      });
+      const detail = text(renderToStaticMarkup(<GameDetail game={game({ spots: [playoff] })} />));
+      expect(detail).toContain("One of the model’s best spots");
+      expect(detail).toContain("Model takes SF +8.5");
+      expect(detail).toContain("and more accurate than Vegas");
     });
 
     it("names the expected QB and whom he replaces", () => {
@@ -128,6 +176,7 @@ describe("web/components", () => {
             kickoff: "2026-09-27T13:00",
             capturedAt: "2026-09-26T11:00:00.000Z",
             started: true,
+            postseason: false,
             modelMargin: 3.4,
             modelTotal: 46.4,
             spread: { side: "NYG", gap: 0.9, line: 2.5, closingLine: 3, clv: 0.5, result: "win" as const },
@@ -141,6 +190,31 @@ describe("web/components", () => {
       expect(html).toContain("12–9 (57.1%)");
       expect(html).toContain("5+ pt disagreements: 2–1");
       expect(html).toContain("TEN @ NYG");
+    });
+
+    it("shows when the model is at its best, naming where it beats Vegas", () => {
+      const situation = {
+        id: "playoffs" as const,
+        label: "Playoff game",
+        market: "spread" as const,
+        description: "Postseason games: the model's side of the spread",
+        games: 52,
+        wins: 31,
+        losses: 21,
+        pushes: 0,
+        seasons: [2022, 2023, 2024, 2025].map((season) => ({ season, wins: 8, losses: 5, pushes: 0 })),
+        seasonsAboveBreakEven: 3,
+        brierEdge: 0.009,
+        marginEdge: 0.48,
+        totalEdge: -0.36,
+        beatsVegas: true,
+        live: { picks: 0, wins: 0, losses: 0, pushes: 0 },
+      };
+      const html = text(renderToStaticMarkup(<RecordView record={{ ...record(), situations: [situation] }} />));
+      expect(html).toContain("When the model is at its best");
+      expect(html).toContain("More accurate than Vegas: playoff game");
+      expect(html).toContain("31–21 (59.6%)");
+      expect(html).toContain("+0.48 pts (beats Vegas)");
     });
 
     it("explains an empty live record", () => {

@@ -1,3 +1,5 @@
+import { gameSituations, situationRecords } from "../eval/situations";
+import type { SituationId, SituationRecord } from "../types/situations";
 import type { TrackerReport } from "../types/tracker";
 import { devigHomeWinProbability } from "../eval/market";
 import { calibrationReport, compareToMarket } from "../eval/report";
@@ -29,6 +31,7 @@ export interface GameInputs {
   baseline: { home: TeamWeekFeatures; away: TeamWeekFeatures };
   absences: { home: TeamAbsence | undefined; away: TeamAbsence | undefined };
   names: ReadonlyMap<string, string>;
+  situations?: ReadonlyMap<SituationId, SituationRecord>;
 }
 
 const netRating = (f: TeamWeekFeatures) => f.offense.all - f.defense.all;
@@ -110,6 +113,22 @@ export function buildDashboardGame(inputs: GameInputs): DashboardGame {
     total: p.total,
     marginHistogram: p.marginHistogram,
     totalHistogram: p.totalHistogram,
+    spots: inputs.situations
+      ? gameSituations(
+          {
+            week: game.week,
+            postseason: game.gameType !== "REG",
+            home: game.home,
+            away: game.away,
+            modelMargin: p.margin.mean,
+            modelTotal: p.total.mean,
+            spreadLine: game.spreadLine,
+            totalLine: game.totalLine,
+          },
+          final,
+          inputs.situations,
+        )
+      : undefined,
     vegas: {
       spread: game.spreadLine,
       total: game.totalLine,
@@ -177,5 +196,6 @@ export function buildRecord(
     seasons: compareToMarket(predictions),
     calibration: calibrationReport(predictions),
     tracker,
+    situations: situationRecords(predictions, tracker),
   };
 }

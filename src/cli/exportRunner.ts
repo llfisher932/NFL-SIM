@@ -25,6 +25,7 @@ import { fitDriveModel } from "../sim/driveModel";
 import { buildMatchup, createWeekFeatureCache, ratingLookupFrom, teamsBySeason } from "../sim/matchups";
 import { projectGame } from "../sim/monteCarlo";
 import { hashSeed } from "../sim/rng";
+import { situationRecords } from "../eval/situations";
 import { hasStarted, trackerReport, trackPicks } from "../eval/tracker";
 import type { DashboardIndexEntry, DashboardWeek } from "../types/dashboard";
 import type { PickSnapshot } from "../types/tracker";
@@ -81,6 +82,7 @@ export async function exportWeeks(options: ExportOptions): Promise<void> {
   const entries: DashboardIndexEntry[] = [];
   const now = new Date();
   const snapshots: PickSnapshot[] = [];
+  const situations = new Map(situationRecords(data.backtest ?? []).map((r) => [r.id, r]));
   for (const week of weeks) {
     const target = { season, week };
     const games = data.games.filter((g) => g.season === season && g.week === week);
@@ -148,6 +150,7 @@ export async function exportWeeks(options: ExportOptions): Promise<void> {
           baseline: { home: baseline.get(game.home)!, away: baseline.get(game.away)! },
           absences: { home: adjusted?.absences.get(game.home), away: adjusted?.absences.get(game.away) },
           names: data.names,
+          situations,
         }),
       ),
     };

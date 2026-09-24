@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { DashboardWeek } from "../../../src/types/dashboard";
 import { generatedLabel, pct } from "../lib/format";
 import { GameCard, modelPickCorrect } from "./GameCard";
+import { ModelSpots } from "./ModelSpots";
 
 type SortKey = "kickoff" | "confidence" | "disagreement";
 
@@ -51,6 +52,7 @@ export function Slate({ week, refreshing }: { week: DashboardWeek; refreshing: b
           </p>
         </div>
       </div>
+      <ModelSpots games={week.games} />
       <div className="filter-row">
         <div className="segmented" role="group" aria-label="Sort games">
           {SORTS.map((s) => (

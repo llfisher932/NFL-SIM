@@ -1,3 +1,4 @@
+import type { SituationPick, SituationRecord } from "./situations";
 import type { TrackerReport } from "./tracker";
 import type { CalibrationReport } from "../eval/report";
 import type { SeasonComparison } from "./eval";
@@ -60,6 +61,8 @@ export interface DashboardGame {
   totalHistogram: Histogram;
   vegas: { spread: number | null; total: number | null; homeWinProb: number | null };
   final: { home: number; away: number } | null;
+  // The model's picks here that fall into its historically strongest situations.
+  spots?: SituationPick[] | undefined;
   players: DashboardPlayer[];
 }
 
@@ -93,4 +96,5 @@ export interface DashboardRecord {
   calibration: CalibrationReport;
   // Picks logged before kickoff this season, graded as games finish.
   tracker?: TrackerReport | undefined;
+  situations?: SituationRecord[] | undefined;
 }

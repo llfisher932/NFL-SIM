@@ -44,6 +44,9 @@ export function GameCard({ game }: { game: DashboardGame }) {
     )
     .sort((a, b) => chipPriority(a.group) - chipPriority(b.group) || b.role - a.role);
   const room = Math.max(0, MAX_CHIPS - resting.length);
+  const spots = game.spots ?? [];
+  const bets = [...new Set(spots.map((s) => s.bet))];
+  const spotResult = spots.find((s) => s.result !== null)?.result ?? null;
   const correct = modelPickCorrect(game);
 
   return (
@@ -71,6 +74,14 @@ export function GameCard({ game }: { game: DashboardGame }) {
         <dd className={totalGap >= DISAGREEMENT_POINTS ? "disagree" : undefined}>Model {fixed(game.total.mean)}</dd>
         <dd className="vs">Vegas {game.vegas.total === null ? "—" : fixed(game.vegas.total)}</dd>
       </dl>
+      {bets.length > 0 && (
+        <div className="chips" aria-label="Model's best spot">
+          <span className="chip spot">
+            Model spot: <b>{bets.join(" · ")}</b>
+            {spotResult && ` (${spotResult === "win" ? "won" : spotResult === "loss" ? "lost" : "push"})`}
+          </span>
+        </div>
+      )}
       {resting.length + out.length > 0 && (
         <div className="chips" aria-label="Key players injured, inactive or resting">
           {resting.map((team) => (

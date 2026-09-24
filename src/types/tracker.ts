@@ -33,6 +33,7 @@ export interface TrackedPick extends SeasonWeek {
   kickoff: string | null;
   capturedAt: string;
   started: boolean;
+  postseason: boolean;
   modelMargin: number;
   modelTotal: number;
   spread: LinePick | null;

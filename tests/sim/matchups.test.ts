@@ -46,6 +46,10 @@ describe("sim/matchups", () => {
       expect(buildMatchup(week, game).home).toEqual({ team: "LA", offense: 0.1, defense: -0.02, playsPerGame: 66 });
     });
 
+    it("carries the week's league EPA level", () => {
+      expect(buildMatchup(week, game).leagueEpa).toBe(0);
+    });
+
     it("uses the week's average pace as the league pace", () => {
       expect(buildMatchup(week, game).leaguePlaysPerGame).toBe(64);
     });
@@ -84,9 +88,9 @@ describe("sim/matchups", () => {
   });
 
   describe("ratingLookupFrom", () => {
-    it("returns the overall offense and defense ratings", () => {
+    it("returns the overall offense and defense ratings with the league level", () => {
       const lookup = ratingLookupFrom(() => week);
-      expect(lookup({ season: 2025, week: 5 }, "SF")).toEqual({ offense: 0.04, defense: 0.03 });
+      expect(lookup({ season: 2025, week: 5 }, "SF")).toEqual({ offense: 0.04, defense: 0.03, league: 0 });
     });
   });
 

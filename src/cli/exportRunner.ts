@@ -1,3 +1,4 @@
+import { FIRST_DATA_SEASON } from "../features/league";
 import { loadPlayerNames } from "../data/availability";
 import { loadBacktestPredictions } from "../data/backtestStore";
 import {
@@ -33,7 +34,6 @@ import type { PickSnapshot } from "../types/tracker";
 import { loadInjuryInputs, mergeOverrides } from "./injuryContext";
 
 
-const FIRST_DATA_SEASON = 2021;
 
 export interface ExportOptions {
   season: number;
@@ -143,6 +143,11 @@ export async function exportWeeks(options: ExportOptions): Promise<void> {
       sims,
       seed,
       injuries: injuryModel !== null,
+      spotRules: {
+        qualifying: [...situations.values()].filter((s) => s.qualifies).map((s) => s.label),
+        firstSeason: Math.min(...[...situations.values()].map((s) => s.firstSeason ?? Infinity)),
+        lastSeason: Math.max(...[...situations.values()].map((s) => s.lastSeason ?? -Infinity)),
+      },
       games: games.map((game) =>
         buildDashboardGame({
           game,

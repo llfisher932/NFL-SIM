@@ -10,9 +10,9 @@ export interface Database {
   close(): void;
 }
 
-export async function openDatabase(path: string = DEFAULT_DB_PATH): Promise<Database> {
+export async function openDatabase(path: string = DEFAULT_DB_PATH, options: { readOnly?: boolean } = {}): Promise<Database> {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-  const instance = await DuckDBInstance.create(path);
+  const instance = await DuckDBInstance.create(path, options.readOnly ? { access_mode: "READ_ONLY" } : {});
   const connection = await instance.connect();
   return {
     connection,

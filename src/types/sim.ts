@@ -114,6 +114,8 @@ export interface Matchup {
   neutralSite: boolean;
   postseason: boolean;
   leaguePlaysPerGame: number;
+  // League-wide EPA/play that week, the scoring environment both offenses play in.
+  leagueEpa?: number;
   // Home rest days minus away rest days.
   restDiff?: number;
 }

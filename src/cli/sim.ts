@@ -1,3 +1,4 @@
+import { FIRST_DATA_SEASON, seasonsFrom } from "../features/league";
 import { parseArgs } from "node:util";
 import { DEFAULT_DB_PATH, openDatabase } from "../data/db";
 import { DEFAULT_OVERRIDES_PATH, loadOverrides } from "../data/overrides";
@@ -47,7 +48,7 @@ async function main(): Promise<void> {
         await loadDrives(db.connection),
         await loadConversionCounts(db.connection),
         await loadWeekGames(db.connection, target.season, target.week),
-        await loadSeasonGames(db.connection, Array.from({ length: target.season - 2020 }, (_, i) => 2021 + i)),
+        await loadSeasonGames(db.connection, seasonsFrom(FIRST_DATA_SEASON, target.season)),
         await loadInjuryInputs(db.connection, !values["no-injuries"], overrides),
         await loadPlayerNames(db.connection),
       ] as const;

@@ -1,3 +1,4 @@
+import { CURRENT_CODE, playoffSeeds } from "./league";
 import type { WeekGame } from "../types/sim";
 
 export const DIVISIONS: Record<string, readonly string[]> = {
@@ -11,10 +12,13 @@ export const DIVISIONS: Record<string, readonly string[]> = {
   "NFC West": ["ARI", "LA", "SEA", "SF"],
 };
 
-export const PLAYOFF_SEEDS = 7;
 const MAX_ENUMERATED_GAMES = 14;
 
-const divisionOf = new Map(Object.entries(DIVISIONS).flatMap(([division, teams]) => teams.map((t) => [t, division])));
+const currentDivision = new Map(Object.entries(DIVISIONS).flatMap(([division, teams]) => teams.map((t) => [t, division])));
+const divisionOf = new Map([
+  ...currentDivision,
+  ...Object.entries(CURRENT_CODE).map(([old, current]) => [old, currentDivision.get(current)!] as const),
+]);
 const conferenceOf = (team: string) => divisionOf.get(team)?.slice(0, 3);
 
 export interface Result {
@@ -156,17 +160,24 @@ function rank(teams: readonly string[], s: Standings, steps: (candidates: readon
   return order;
 }
 
-// Seeds 1-7 for one conference. Wild-card ties between teams from one division are first
+const conferenceTeams = (conference: string, results: readonly Result[]) =>
+  [...new Set(results.flatMap((r) => [r.home, r.away]))].filter((t) => conferenceOf(t) === conference).sort();
+
+// Playoff seeds for one conference. Wild-card ties between teams from one division are first
 // reduced to that division's best team, as the NFL does.
-export function seedConference(conference: string, results: readonly Result[]): string[] {
+export function seedConference(conference: string, results: readonly Result[], seedCount = 7): string[] {
   const s = new Standings(results);
-  const divisions = Object.entries(DIVISIONS).filter(([name]) => name.startsWith(conference));
+  const present = conferenceTeams(conference, results);
+  const divisions = Object.keys(DIVISIONS)
+    .filter((name) => name.startsWith(conference))
+    .map((name) => [name, present.filter((t) => divisionOf.get(t) === name)] as const)
+    .filter(([, teams]) => teams.length > 0);
   const divisionOrder = new Map(divisions.map(([name, teams]) => [name, rank(teams, s, () => divisionSteps(s))]));
   const winners = divisions.map(([name]) => divisionOrder.get(name)![0]!);
   const seeds = rank(winners, s, () => wildCardSteps(s));
 
   const others = divisions.flatMap(([name]) => divisionOrder.get(name)!.slice(1));
-  while (seeds.length < PLAYOFF_SEEDS && others.length > 0) {
+  while (seeds.length < seedCount && others.length > 0) {
     const best = Math.max(...others.map((t) => s.winPct(t)));
     const tied = others.filter((t) => Math.abs(s.winPct(t) - best) < 1e-12);
     const perDivision = [...new Set(tied.map((t) => divisionOf.get(t)!))].map((d) =>
@@ -210,11 +221,9 @@ export function lockedSeeds(games: readonly WeekGame[], season: number): Map<str
         homePoints: mask & (1 << i) ? 1 : 0,
         awayPoints: mask & (1 << i) ? 0 : 1,
       }));
-      const seeds = seedConference(conference, [...known, ...outcomes]);
-      const teams = Object.entries(DIVISIONS)
-        .filter(([name]) => name.startsWith(conference))
-        .flatMap(([, t]) => t);
-      for (const team of teams) {
+      const results = [...known, ...outcomes];
+      const seeds = seedConference(conference, results, playoffSeeds(season));
+      for (const team of conferenceTeams(conference, results)) {
         const seed = seeds.indexOf(team) + 1;
         const seen = seedsSeen.get(team) ?? new Set<number>();
         seen.add(seed);

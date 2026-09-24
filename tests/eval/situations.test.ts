@@ -138,6 +138,15 @@ describe("eval/situations", () => {
       expect(worse.beatsVegas).toBe(false);
     });
 
+    it("qualifies only when it beats break-even overall and in most seasons", () => {
+      expect(record.qualifies).toBe(false);
+      expect(situationRecord(situation("disagree-3"), [prediction()]).qualifies).toBe(true);
+    });
+
+    it("reports the first and last backtest seasons", () => {
+      expect([record.firstSeason, record.lastSeason]).toEqual([2023, 2024]);
+    });
+
     it("tallies this season's tracked picks that fit the situation", () => {
       const tracked: TrackedPick = {
         gameId: "2026_05_TEN_NYG",
@@ -169,12 +178,16 @@ describe("eval/situations", () => {
   describe("gameSituations", () => {
     const records = new Map([["disagree-3", situationRecord(situation("disagree-3"), [prediction()])]] as const);
 
-    it("lists the model's pick for each situation the game fits", () => {
+    it("lists the model's pick for each qualifying situation the game fits", () => {
       const spots = gameSituations(input({ week: 2 }), null, records);
-      expect(spots.map((s) => [s.situation, s.bet])).toEqual([
-        ["disagree-3", "NYG −3"],
-        ["early-total", "Over 41.5"],
-      ]);
+      expect(spots.map((s) => [s.situation, s.bet])).toEqual([["disagree-3", "NYG −3"]]);
+    });
+
+    it("flags nothing for a situation without a winning record", () => {
+      const losing = new Map([
+        ["disagree-3", situationRecord(situation("disagree-3"), [prediction({ homeScore: 17, awayScore: 20 })])],
+      ] as const);
+      expect(gameSituations(input(), null, losing)).toEqual([]);
     });
 
     it("attaches the situation's historical record when known", () => {

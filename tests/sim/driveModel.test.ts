@@ -30,6 +30,11 @@ function fingerprint(model: ReturnType<typeof fitDriveModel>): unknown {
 
 describe("sim/driveModel", () => {
   describe("driveFeatures", () => {
+    it("adds the league's scoring level as its own feature", () => {
+      const features = driveFeatures(75, 0.1, 1800, NEUTRAL_STATE, 0.04);
+      expect(features[features.length - 1]).toBeCloseTo(features[3]! * 0.4, 9);
+    });
+
     it("scales field position to [0, 1] with a squared term", () => {
       expect(driveFeatures(75, 0, 1800, NEUTRAL_STATE).slice(0, 3)).toEqual([1, 0.75, 0.5625]);
     });
@@ -46,7 +51,7 @@ describe("sim/driveModel", () => {
 
   describe("game-state features", () => {
     it("are zero at kickoff regardless of score", () => {
-      expect(driveFeatures(75, 0, 1800, { scoreDiff: 14, gameSecondsLeft: 3600 }).slice(8)).toEqual([0, 0, 0]);
+      expect(driveFeatures(75, 0, 1800, { scoreDiff: 14, gameSecondsLeft: 3600 }).slice(8, 11)).toEqual([0, 0, 0]);
     });
 
     it("carry the sign of the lead late in the game", () => {

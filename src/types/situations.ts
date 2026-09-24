@@ -34,6 +34,10 @@ export interface SituationRecord extends LineRecord {
   marginEdge: number | null;
   totalEdge: number | null;
   beatsVegas: boolean;
+  // Beats the betting break-even overall and in most backtest seasons; only these get flagged.
+  qualifies: boolean;
+  firstSeason: number | null;
+  lastSeason: number | null;
   live: LineRecord & { picks: number };
 }
 
@@ -49,5 +53,5 @@ export interface SituationPick {
   bet: string;
   gap: number;
   result: PickResult | null;
-  record: (LineRecord & { seasons: number; seasonsAboveBreakEven: number; beatsVegas: boolean }) | null;
+  record: (LineRecord & { seasons: number; seasonsAboveBreakEven: number; beatsVegas: boolean; firstSeason: number | null }) | null;
 }

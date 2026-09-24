@@ -1,4 +1,4 @@
-import type { DashboardGame } from "../../../src/types/dashboard";
+import type { DashboardGame, DashboardWeek } from "../../../src/types/dashboard";
 import type { SituationPick } from "../../../src/types/situations";
 import { formatHash } from "../lib/route";
 import { resultLabel, spotHistory } from "../lib/spots";
@@ -22,7 +22,7 @@ function SpotLine({ spots }: { spots: SituationPick[] }) {
 
 // Games this week that fall into the situations where the model has historically done best.
 // Spread spots get a row each; totals situations cover many games, so they share one row.
-export function ModelSpots({ games }: { games: DashboardGame[] }) {
+export function ModelSpots({ games, rules }: { games: DashboardGame[]; rules?: DashboardWeek["spotRules"] }) {
   const spreadGames = games.filter((g) => (g.spots ?? []).some((s) => s.market === "spread"));
   const totals = games.flatMap((g) => (g.spots ?? []).filter((s) => s.market === "total").map((s) => ({ game: g, spot: s })));
   const [firstTotal] = totals;
@@ -32,12 +32,18 @@ export function ModelSpots({ games }: { games: DashboardGame[] }) {
         <div>
           <h3>Model{"’"}s best spots this week</h3>
           <p>
-            Picks in situations where the model{"’"}s side has beaten the 52.4% break-even since 2022. Those situations were chosen from past
-            results, so the Record page{"’"}s live tracker is the real test.
+            Picks in situations where the model{"’"}s side has beaten the 52.4% break-even across the{" "}
+            {rules?.firstSeason && rules.lastSeason ? `${rules.firstSeason}${"–"}${rules.lastSeason} ` : ""}backtest in most seasons. The Record
+            page{"’"}s live tracker is the real test.
           </p>
         </div>
       </div>
-      {spreadGames.length === 0 && totals.length === 0 ? (
+      {rules && rules.qualifying.length === 0 ? (
+        <p className="muted" style={{ margin: 0 }}>
+          No situation currently qualifies, so no picks are flagged. Streaks that looked strong in recent seasons didn{"’"}t hold up in the seasons
+          before them; the Record page shows each situation{"’"}s full history.
+        </p>
+      ) : spreadGames.length === 0 && totals.length === 0 ? (
         <p className="muted" style={{ margin: 0 }}>
           No games fit those situations this week.
         </p>

@@ -13,7 +13,8 @@ export function spotHistory(spot: SituationPick): string {
   const r = spot.record;
   if (!r) return "";
   const vegas = r.beatsVegas ? ", and more accurate than Vegas" : "";
-  return `${recordLabel(r)} since 2022, above break-even in ${r.seasonsAboveBreakEven} of ${r.seasons} seasons${vegas}`;
+  const since = r.firstSeason === null ? "" : ` since ${r.firstSeason}`;
+  return `${recordLabel(r)}${since}, above break-even in ${r.seasonsAboveBreakEven} of ${r.seasons} seasons${vegas}`;
 }
 
 export function resultLabel(result: SituationPick["result"]): string | null {

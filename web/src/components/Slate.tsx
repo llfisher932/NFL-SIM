@@ -52,7 +52,7 @@ export function Slate({ week, refreshing }: { week: DashboardWeek; refreshing: b
           </p>
         </div>
       </div>
-      <ModelSpots games={week.games} />
+      <ModelSpots games={week.games} rules={week.spotRules} />
       <div className="filter-row">
         <div className="segmented" role="group" aria-label="Sort games">
           {SORTS.map((s) => (

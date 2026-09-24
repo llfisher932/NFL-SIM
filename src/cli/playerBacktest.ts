@@ -1,3 +1,4 @@
+import { FIRST_DATA_SEASON, seasonsFrom } from "../features/league";
 import { parseArgs } from "node:util";
 import { DEFAULT_DB_PATH, openDatabase } from "../data/db";
 import { loadConversionCounts, loadDrives, loadSeasonGames } from "../data/drives";
@@ -69,7 +70,7 @@ async function main(): Promise<void> {
         drives: await loadDrives(db.connection),
         conversions: await loadConversionCounts(db.connection),
         playerGames: await loadPlayerGames(db.connection),
-        games: await loadSeasonGames(db.connection, Array.from({ length: season - 2020 }, (_, i) => 2021 + i)),
+        games: await loadSeasonGames(db.connection, seasonsFrom(FIRST_DATA_SEASON, season)),
         injuries: await loadInjuryInputs(db.connection, !values["no-injuries"]),
       };
     } finally {

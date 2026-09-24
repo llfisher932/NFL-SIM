@@ -14,7 +14,8 @@ import { fitMultinomial, softmaxProbabilities, type MultinomialModel } from "./m
 import { createNearestSampler, type NearestSampler } from "./nearestSampler";
 import { sampleIndex, type Rng } from "./rng";
 
-export type RatingLookup = (at: SeasonWeek, team: string) => { offense: number; defense: number };
+// league is the league-wide EPA/play level that week, so drive outcomes follow the scoring environment.
+export type RatingLookup = (at: SeasonWeek, team: string) => { offense: number; defense: number; league?: number };
 
 export interface DriveTemplate {
   endYardline: number;
@@ -25,7 +26,7 @@ export interface DriveTemplate {
 export interface DriveModel {
   trainingDrives: number;
   outcomeModel: MultinomialModel;
-  outcomeProbabilities(startYardline: number, matchupEpa: number, secondsLeft: number, state: GameState): number[];
+  outcomeProbabilities(startYardline: number, matchupEpa: number, secondsLeft: number, state: GameState, leagueEpa?: number): number[];
   sampleDrive(
     outcome: DriveOutcome,
     startYardline: number,
@@ -62,7 +63,9 @@ export function leadState(state: GameState): LeadState {
   return "close";
 }
 
-export function driveFeatures(startYardline: number, matchupEpa: number, secondsLeft: number, state: GameState): number[] {
+// leagueEpa gets its own coefficient, apart from the matchup's team-strength gap, so league-wide
+// scoring swings don't dilute how team differences turn into drive outcomes.
+export function driveFeatures(startYardline: number, matchupEpa: number, secondsLeft: number, state: GameState, leagueEpa = 0): number[] {
   const fieldPosition = startYardline / 100;
   const lead = Math.max(-1, Math.min(1, state.scoreDiff / LEAD_SCALE));
   const elapsed = 1 - Math.max(0, Math.min(3600, state.gameSecondsLeft)) / 3600;
@@ -78,6 +81,7 @@ export function driveFeatures(startYardline: number, matchupEpa: number, seconds
     lead * elapsed,
     lead * elapsed * elapsed,
     Math.abs(lead) * elapsed,
+    MATCHUP_SCALE * leagueEpa,
   ];
 }
 
@@ -106,12 +110,16 @@ export function fitDriveModel(
     );
   }
 
-  const matchupOf = (d: DriveRecord) => {
+  const ratingsOf = (d: DriveRecord) => {
     const at = { season: d.season, week: d.week };
-    return ratings(at, d.offense).offense + ratings(at, d.defense).defense;
+    const offense = ratings(at, d.offense);
+    return { matchup: offense.offense + ratings(at, d.defense).defense, league: offense.league ?? 0 };
   };
   const outcomeModel = fitMultinomial(
-    training.map((d) => driveFeatures(d.startYardline, matchupOf(d), d.startSeconds, d)),
+    training.map((d) => {
+      const r = ratingsOf(d);
+      return driveFeatures(d.startYardline, r.matchup, d.startSeconds, d, r.league);
+    }),
     training.map((d) => DRIVE_OUTCOMES.indexOf(d.outcome)),
     DRIVE_OUTCOMES.length,
     { l2: config.l2 },
@@ -179,8 +187,8 @@ export function fitDriveModel(
   return {
     trainingDrives: training.length,
     outcomeModel,
-    outcomeProbabilities: (startYardline, matchupEpa, secondsLeft, state) =>
-      softmaxProbabilities(outcomeModel, driveFeatures(startYardline, matchupEpa, secondsLeft, state)),
+    outcomeProbabilities: (startYardline, matchupEpa, secondsLeft, state, leagueEpa = 0) =>
+      softmaxProbabilities(outcomeModel, driveFeatures(startYardline, matchupEpa, secondsLeft, state, leagueEpa)),
     sampleDrive: (outcome, startYardline, secondsLeft, paceScale, rng, state) => {
       const sampler = templates[outcome](secondsLeft, state);
       const maxSeconds = secondsLeft / paceScale;

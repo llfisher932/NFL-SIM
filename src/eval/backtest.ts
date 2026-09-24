@@ -157,3 +157,10 @@ export function runBacktest(
   }
   return predictions;
 }
+
+// Deals seasons round-robin to parallel workers, so each gets a similar mix of seasons.
+export function splitSeasons(seasons: readonly number[], workers: number): number[][] {
+  const shards = Array.from({ length: Math.max(1, Math.min(workers, seasons.length)) }, () => [] as number[]);
+  seasons.forEach((season, i) => shards[i % shards.length]!.push(season));
+  return shards;
+}

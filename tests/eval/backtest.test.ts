@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { backtestWeeks, runBacktest, type BacktestInputs, type WeekProgress } from "../../src/eval/backtest";
+import { backtestWeeks, runBacktest, type BacktestInputs, type WeekProgress, splitSeasons } from "../../src/eval/backtest";
 import { DEFAULT_FEATURE_CONFIG } from "../../src/features/config";
 import type { BacktestPrediction } from "../../src/types/eval";
 import type { TeamGame } from "../../src/types/features";
@@ -55,6 +55,19 @@ const atOrAfter = (item: { season: number; week: number }, week: number) =>
   item.season > 2023 || (item.season === 2023 && item.week >= week);
 
 describe("eval/backtest", () => {
+  describe("splitSeasons", () => {
+    it("deals seasons round-robin to workers", () => {
+      expect(splitSeasons([2015, 2016, 2017, 2018, 2019], 2)).toEqual([
+        [2015, 2017, 2019],
+        [2016, 2018],
+      ]);
+    });
+
+    it("uses no more workers than seasons", () => {
+      expect(splitSeasons([2024, 2025], 8)).toEqual([[2024], [2025]]);
+    });
+  });
+
   describe("backtestWeeks", () => {
     it("lists completed weeks of the requested seasons in order", () => {
       const games = [

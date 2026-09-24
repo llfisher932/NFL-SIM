@@ -31,7 +31,7 @@ function teamFeatures(week: WeekFeatures, team: string, at: SeasonWeek): TeamWee
 export function ratingLookupFrom(weekFeatures: (at: SeasonWeek) => WeekFeatures): RatingLookup {
   return (at, team) => {
     const f = teamFeatures(weekFeatures(at), team, at);
-    return { offense: f.offense.all, defense: f.defense.all };
+    return { offense: f.offense.all, defense: f.defense.all, league: f.league.all };
   };
 }
 
@@ -47,6 +47,7 @@ export function buildMatchup(week: WeekFeatures, game: WeekGame): Matchup {
     neutralSite: game.neutralSite,
     postseason: game.gameType !== "REG",
     leaguePlaysPerGame: all.reduce((sum, f) => sum + f.playsPerGame, 0) / all.length,
+    leagueEpa: teamFeatures(week, game.home, game).league.all,
     ...(game.homeRest != null && game.awayRest != null ? { restDiff: game.homeRest - game.awayRest } : {}),
   };
 }

@@ -20,7 +20,7 @@ const spot = (overrides: Partial<SituationPick> = {}): SituationPick => ({
   bet: "SF +8.5",
   gap: -4,
   result: null,
-  record: { wins: 179, losses: 137, pushes: 0, seasons: 4, seasonsAboveBreakEven: 3, beatsVegas: false },
+  record: { wins: 179, losses: 137, pushes: 0, seasons: 4, seasonsAboveBreakEven: 3, beatsVegas: false, firstSeason: 2022 },
   ...overrides,
 });
 
@@ -89,6 +89,13 @@ describe("web/components", () => {
       expect(html).toContain("179–137 (56.6%) since 2022, above break-even in 3 of 4 seasons");
     });
 
+    it("explains when no situation qualifies", () => {
+      const slate = week({ spotRules: { qualifying: [], firstSeason: 2015, lastSeason: 2025 } });
+      const html = text(renderToStaticMarkup(<Slate week={slate} refreshing={false} />));
+      expect(html).toContain("No situation currently qualifies, so no picks are flagged");
+      expect(html).toContain("across the 2015–2025 backtest");
+    });
+
     it("says when no game fits a best spot", () => {
       expect(text(renderToStaticMarkup(<Slate week={week()} refreshing={false} />))).toContain("No games fit those situations this week");
     });
@@ -113,7 +120,7 @@ describe("web/components", () => {
       const playoff = spot({
         situation: "playoffs",
         label: "Playoff game",
-        record: { wins: 31, losses: 21, pushes: 0, seasons: 4, seasonsAboveBreakEven: 3, beatsVegas: true },
+        record: { wins: 31, losses: 21, pushes: 0, seasons: 4, seasonsAboveBreakEven: 3, beatsVegas: true, firstSeason: 2022 },
       });
       const detail = text(renderToStaticMarkup(<GameDetail game={game({ spots: [playoff] })} />));
       expect(detail).toContain("One of the model’s best spots");
@@ -237,10 +244,14 @@ describe("web/components", () => {
         marginEdge: 0.48,
         totalEdge: -0.36,
         beatsVegas: true,
+        qualifies: true,
+        firstSeason: 2022,
+        lastSeason: 2025,
         live: { picks: 0, wins: 0, losses: 0, pushes: 0 },
       };
       const html = text(renderToStaticMarkup(<RecordView record={{ ...record(), situations: [situation] }} />));
-      expect(html).toContain("When the model is at its best");
+      expect(html).toContain("Situations tracked");
+      expect(html).toContain("Records cover the 2022–2025 walk-forward backtest");
       expect(html).toContain("More accurate than Vegas: playoff game");
       expect(html).toContain("31–21 (59.6%)");
       expect(html).toContain("+0.48 pts (beats Vegas)");

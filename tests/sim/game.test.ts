@@ -83,6 +83,10 @@ describe("sim/game", () => {
       expect(matchupEpa(evenMatchup, "away", 0.02, 0.006)).toBeCloseTo(-0.01 - 0.02 - 0.026);
     });
 
+    it("leaves the league's scoring level out of the team matchup", () => {
+      expect(matchupEpa({ ...evenMatchup, leagueEpa: 0.04 }, "home", 0.02)).toBeCloseTo(0.05 + 0.03 + 0.02);
+    });
+
     it("applies the rest edge at a neutral site", () => {
       expect(matchupEpa({ ...evenMatchup, neutralSite: true }, "home", 0.02, 0.006)).toBeCloseTo(0.086);
     });

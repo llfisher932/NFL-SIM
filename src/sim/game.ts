@@ -78,7 +78,7 @@ function playPeriod(
     possessed[offense] = true;
     const defense = other(offense);
     const gameState = { scoreDiff: state.score[offense] - state.score[defense], gameSecondsLeft: clock + rules.secondsAfter };
-    const probabilities = model.outcomeProbabilities(start, matchupEpa(matchup, offense, config.homeFieldEpa, restEdgeEpa(matchup, config)), clock, gameState);
+    const probabilities = model.outcomeProbabilities(start, matchupEpa(matchup, offense, config.homeFieldEpa, restEdgeEpa(matchup, config)), clock, gameState, matchup.leagueEpa ?? 0);
     const outcome = DRIVE_OUTCOMES[sampleIndex(probabilities, rng)]!;
     const drive = model.sampleDrive(outcome, start, clock, paceScale[offense], rng, gameState);
     if (outcome === "end_of_half") {

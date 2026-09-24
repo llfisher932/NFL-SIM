@@ -16,17 +16,21 @@ function accuracy(s: SituationRecord): string {
 
 export function SituationsSection({ situations, season }: { situations: SituationRecord[]; season: number | null }) {
   const better = situations.filter((s) => s.beatsVegas);
+  const first = Math.min(...situations.map((s) => s.firstSeason ?? Infinity));
+  const last = Math.max(...situations.map((s) => s.lastSeason ?? -Infinity));
+  const range = Number.isFinite(first) && Number.isFinite(last) ? `${first}${"–"}${last}` : "backtest";
   return (
     <section className="card chart-card situations">
       <div className="chart-head">
         <div>
-          <h3>When the model is at its best</h3>
+          <h3>Situations tracked</h3>
           <p>
             {better.length > 0
               ? `More accurate than Vegas: ${better.map((s) => s.label.toLowerCase()).join(", ")}. `
               : "Vegas is more accurate in every situation below. "}
-            These are the situations where the model{"’"}s side of the line has won most often in the 2022{"–"}2025 walk-forward backtest; they were
-            chosen after looking at those results, so treat them as leads. Break-even at standard odds is {pct(BREAK_EVEN, 1)}.
+            Records cover the {range} walk-forward backtest. These situations were first picked from 2022{"–"}2025 results, so the earlier seasons
+            are an honest check; a situation is only flagged on the slate when it beats the {pct(BREAK_EVEN, 1)} break-even overall and in most
+            seasons.
           </p>
         </div>
       </div>

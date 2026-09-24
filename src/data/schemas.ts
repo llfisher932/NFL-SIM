@@ -170,7 +170,7 @@ export const injuryReportRowSchema = z.object({
   gsis_id: matching("gsis_id", GSIS_ID),
   position: z.string({ error: issueMessage("position") }),
   full_name: text("full_name"),
-  report_status: oneOf("report_status", ["Out", "Doubtful", "Questionable", "Note"]).nullable(),
+  report_status: oneOf("report_status", ["Out", "Doubtful", "Questionable", "Probable", "Note"]).nullable(),
   practice_status: z.string({ error: issueMessage("practice_status") }).nullable(),
 });
 

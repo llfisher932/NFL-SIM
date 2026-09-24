@@ -77,6 +77,20 @@ describe("features/teamFeatures", () => {
       });
     });
 
+    describe("after a franchise moves", () => {
+      const sanDiego = [1, 2, 3, 4].flatMap((week) => [
+        teamGame({ season: 2016, week, team: "SD", opponent: "KC", passEpa: 35 * 0.3, rushEpa: 25 * 0.3 }),
+        teamGame({ season: 2016, week, team: "KC", opponent: "SD" }),
+      ]);
+      const endOf2016 = featuresAt(sanDiego, { season: 2016, week: END_OF_SEASON_WEEK }, ["SD", "KC"], config);
+      const week1 = featuresAt(sanDiego, { season: 2017, week: 1 }, ["LAC", "KC"], config);
+
+      it("starts the franchise from its rating under the old code", () => {
+        expect(find(week1, "LAC").offense.all).toBeCloseTo(config.retention.offense * find(endOf2016, "SD").offense.all, 9);
+        expect(find(week1, "LAC").offense.all).toBeGreaterThan(0);
+      });
+    });
+
     describe("early-season regression to the mean", () => {
       const opponents = ["B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M"];
       const games = opponents.flatMap((opp, i) => [game(i + 1, "A", opp, 0.3), game(i + 1, opp, "A", 0)]);

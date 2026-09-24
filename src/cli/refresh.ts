@@ -1,3 +1,4 @@
+import { FIRST_DATA_SEASON } from "../features/league";
 import { parseArgs } from "node:util";
 import { DownloadError } from "../data/cache";
 import { DEFAULT_DASHBOARD_DIR } from "../data/dashboardStore";
@@ -11,7 +12,6 @@ import { cliErrorMessage, currentSeason, parseSeason, parseSeed, parseSims } fro
 import { exportWeeks } from "./exportRunner";
 import { buildDashboard, publishDashboard } from "./publish";
 
-const FIRST_DATA_SEASON = 2021;
 
 const { values } = parseArgs({
   options: {

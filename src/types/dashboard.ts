@@ -76,6 +76,8 @@ export interface DashboardWeek {
   seed: number;
   injuries: boolean;
   games: DashboardGame[];
+  // Situations good enough to flag, and the backtest seasons they were judged on.
+  spotRules?: { qualifying: string[]; firstSeason: number | null; lastSeason: number | null } | undefined;
 }
 
 export interface DashboardIndexEntry {

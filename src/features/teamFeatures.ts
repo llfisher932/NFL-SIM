@@ -8,6 +8,7 @@ import type {
   UnitRatings,
 } from "../types/features";
 import { END_OF_SEASON_WEEK } from "./config";
+import { PREVIOUS_CODE } from "./league";
 import { fitOpponentAdjusted, type Observation } from "./opponentAdjust";
 import { regressToward, shrinkRate } from "./shrinkage";
 import { seasonWindow, type Weighted } from "./window";
@@ -38,6 +39,12 @@ function splitSample(game: TeamGame, split: Split): { plays: number; epa: number
   if (split === "pass") return { plays: game.passPlays, epa: game.passEpa };
   if (split === "rush") return { plays: game.rushPlays, epa: game.rushEpa };
   return { plays: game.passPlays + game.rushPlays, epa: game.passEpa + game.rushEpa };
+}
+
+// A relocated franchise carries its rating from the code it used before the move.
+function teamPrior(prior: SeasonPrior, team: string): TeamPrior | undefined {
+  const previous = PREVIOUS_CODE[team];
+  return prior.teams.get(team) ?? (previous === undefined ? undefined : prior.teams.get(previous));
 }
 
 function emptyPrior(config: FeatureConfig): SeasonPrior {
@@ -99,7 +106,7 @@ function fitSplit(
       : [];
   });
   const priorFor = (side: "offense" | "defense") =>
-    new Map(teams.map((team) => [team, prior.teams.get(team)?.[side][split] ?? 0]));
+    new Map(teams.map((team) => [team, teamPrior(prior, team)?.[side][split] ?? 0]));
   return fitOpponentAdjusted(
     observations,
     teams,
@@ -132,7 +139,7 @@ function ratingsAt(
 
   return teams.map((team) => {
     const own = window.filter((g) => g.item.team === team);
-    const teamPrior = prior.teams.get(team);
+    const ownPrior = teamPrior(prior, team);
     const sum = (f: (g: Weighted<TeamGame>) => number) => own.reduce((acc, g) => acc + f(g), 0);
     return {
       season: target.season,
@@ -145,13 +152,13 @@ function ratingsAt(
       playsPerGame: shrinkRate(
         sum((g) => g.weight * g.item.plays),
         sum((g) => g.weight),
-        teamPrior?.playsPerGame ?? prior.playsPerGame,
+        ownPrior?.playsPerGame ?? prior.playsPerGame,
         config.playsPerGame.priorWeight,
       ),
       neutralPassRate: shrinkRate(
         sum((g) => g.weight * g.item.neutralPasses),
         sum((g) => g.weight * g.item.neutralPlays),
-        teamPrior?.neutralPassRate ?? prior.neutralPassRate,
+        ownPrior?.neutralPassRate ?? prior.neutralPassRate,
         config.neutralPassRate.priorWeight,
       ),
     };

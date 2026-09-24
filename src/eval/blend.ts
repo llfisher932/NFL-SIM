@@ -1,5 +1,5 @@
 import type { BacktestPrediction } from "../types/eval";
-import { regularSeasonWeeks } from "./situations";
+import { regularSeasonWeeks } from "../features/league";
 
 export interface BlendWeights {
   margin: { regular: number; playoffs: number };

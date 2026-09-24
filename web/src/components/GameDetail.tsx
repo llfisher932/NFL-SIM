@@ -156,7 +156,7 @@ export function GameDetail({ game }: { game: DashboardGame }) {
           <div className="chart-head">
             <div>
               <h3>One of the model{"’"}s best spots</h3>
-              <p>This game fits situations where the model{"’"}s side of the line has done best since 2022.</p>
+              <p>This game fits situations where the model{"’"}s side of the line has beaten the break-even in most backtest seasons.</p>
             </div>
           </div>
           <ul className="spot-list">

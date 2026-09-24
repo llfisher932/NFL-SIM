@@ -89,6 +89,36 @@ describe("features/seeding", () => {
     });
   });
 
+  describe("before the 2020 expansion and franchise moves", () => {
+    const oldAfc = [
+      ...record("NE", 12, 4),
+      ...record("MIA", 10, 6),
+      ...record("BUF", 8, 8),
+      ...record("NYJ", 6, 10),
+      ...record("PIT", 11, 5),
+      ...record("BAL", 9, 7),
+      ...record("CIN", 7, 9),
+      ...record("CLE", 3, 13),
+      ...record("HOU", 10, 6),
+      ...record("IND", 8, 8),
+      ...record("JAX", 5, 11),
+      ...record("TEN", 4, 12),
+      ...record("DEN", 13, 3),
+      ...record("KC", 11, 5),
+      ...record("OAK", 9, 7),
+      ...record("SD", 4, 12),
+    ];
+
+    it("places old team codes in their divisions", () => {
+      const seeds = seedConference("AFC", oldAfc, 6);
+      expect(seeds.slice(0, 4).sort()).toEqual(["DEN", "HOU", "NE", "PIT"]);
+    });
+
+    it("seeds six teams when asked", () => {
+      expect(seedConference("AFC", oldAfc, 6)).toEqual(["DEN", "NE", "PIT", "HOU", "KC", "MIA"]);
+    });
+  });
+
   describe("lockedSeeds", () => {
     it("locks a team that holds its seed under every final-week outcome", () => {
       expect(lockedSeeds(runawaySeason(), 2024).get("BUF")).toBe(1);

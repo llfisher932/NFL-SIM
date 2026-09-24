@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import {
+  injuryReportRowSchema,
   pbpRowSchema,
   playerWeeklyStatsRowSchema,
   scheduleRowSchema,
@@ -161,6 +162,18 @@ describe("data/schemas", () => {
         const row = playerWeeklyStatsRow({ target_share: 1.5 });
         expect(reasonFor(playerWeeklyStatsRowSchema, row)).toBe("invalid target_share");
       });
+    });
+  });
+
+  describe("injuryReportRowSchema", () => {
+    const row = { season: 2014, week: 3, game_type: "REG", team: "SD", gsis_id: "00-0027973", position: "QB", full_name: "Philip Rivers", practice_status: null };
+
+    it("accepts Probable, the pre-2016 status for players expected to play", () => {
+      expect(reasonFor(injuryReportRowSchema, { ...row, report_status: "Probable" })).toBeNull();
+    });
+
+    it("rejects an unknown status", () => {
+      expect(reasonFor(injuryReportRowSchema, { ...row, report_status: "Maybe" })).toBe("invalid report_status");
     });
   });
 });

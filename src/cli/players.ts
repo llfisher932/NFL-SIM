@@ -1,3 +1,4 @@
+import { FIRST_DATA_SEASON, seasonsFrom } from "../features/league";
 import { parseArgs } from "node:util";
 import { DEFAULT_DB_PATH, openDatabase } from "../data/db";
 import { loadConversionCounts, loadDrives, loadSeasonGames, loadWeekGames } from "../data/drives";
@@ -74,7 +75,7 @@ async function main(): Promise<void> {
       (g) => !values.team || g.home === values.team || g.away === values.team,
     );
     if (games.length === 0) throw new Error(`no games for ${target.season} week ${target.week}`);
-    const allGames = await loadSeasonGames(db.connection, Array.from({ length: target.season - 2020 }, (_, i) => 2021 + i));
+    const allGames = await loadSeasonGames(db.connection, seasonsFrom(FIRST_DATA_SEASON, target.season));
     const injuryInputs = await loadInjuryInputs(db.connection, !values["no-injuries"], overrides);
 
     const weekFeatures = createWeekFeatureCache(createFeatureModel(teamGames, DEFAULT_FEATURE_CONFIG), teamsBySeason(teamGames, allGames));

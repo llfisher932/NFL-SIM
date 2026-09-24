@@ -1,3 +1,4 @@
+import { regularSeasonWeeks } from "../features/league";
 import type { BacktestPrediction } from "../types/eval";
 import type { LineRecord, Market, SituationId, SituationInput, SituationPick, SituationRecord } from "../types/situations";
 import type { PickResult, TrackedPick, TrackerReport } from "../types/tracker";
@@ -13,8 +14,8 @@ export interface Situation {
   applies(input: SituationInput): boolean;
 }
 
-// Situations where the model's side has historically done best, found by slicing the 2022-2025
-// walk-forward backtest. They were picked after looking, so the live record is the real test.
+// Candidate situations, first picked from the 2022-2025 backtest. Earlier seasons are an
+// out-of-sample check, and a situation is only flagged once it beats break-even across them.
 export const SITUATIONS: readonly Situation[] = [
   {
     id: "playoffs",
@@ -46,7 +47,6 @@ export const SITUATIONS: readonly Situation[] = [
   },
 ];
 
-export const regularSeasonWeeks = (season: number) => (season >= 2021 ? 18 : 17);
 
 function handicap(value: number): string {
   if (value === 0) return "pk";
@@ -156,6 +156,7 @@ export function situationRecord(situation: Situation, predictions: readonly Back
     if (pick.result) tally(live, pick.result);
   }
 
+  const seasonsAboveBreakEven = seasons.filter((s) => (winRate(s) ?? 0) > BREAK_EVEN).length;
   return {
     id: situation.id,
     label: situation.label,
@@ -164,7 +165,10 @@ export function situationRecord(situation: Situation, predictions: readonly Back
     games,
     ...overall,
     seasons,
-    seasonsAboveBreakEven: seasons.filter((s) => (winRate(s) ?? 0) > BREAK_EVEN).length,
+    seasonsAboveBreakEven,
+    qualifies: (winRate(overall) ?? 0) > BREAK_EVEN && 2 * seasonsAboveBreakEven > seasons.length,
+    firstSeason: seasons[0]?.season ?? null,
+    lastSeason: seasons[seasons.length - 1]?.season ?? null,
     brierEdge,
     marginEdge,
     totalEdge,
@@ -184,10 +188,10 @@ export function gameSituations(
   records: ReadonlyMap<SituationId, SituationRecord>,
 ): SituationPick[] {
   return SITUATIONS.flatMap((situation): SituationPick[] => {
-    if (!situation.applies(input)) return [];
+    const record = records.get(situation.id);
+    if (!record?.qualifies || !situation.applies(input)) return [];
     const pick = sidePick(situation.market, input);
     if (!pick) return [];
-    const record = records.get(situation.id);
     return [
       {
         situation: situation.id,
@@ -195,16 +199,15 @@ export function gameSituations(
         market: situation.market,
         ...pick,
         result: final ? gradePick(situation.market, pick.gap, pick.line, final) : null,
-        record: record
-          ? {
-              wins: record.wins,
-              losses: record.losses,
-              pushes: record.pushes,
-              seasons: record.seasons.length,
-              seasonsAboveBreakEven: record.seasonsAboveBreakEven,
-              beatsVegas: record.beatsVegas,
-            }
-          : null,
+        record: {
+          wins: record.wins,
+          losses: record.losses,
+          pushes: record.pushes,
+          seasons: record.seasons.length,
+          seasonsAboveBreakEven: record.seasonsAboveBreakEven,
+          beatsVegas: record.beatsVegas,
+          firstSeason: record.firstSeason,
+        },
       },
     ];
   });

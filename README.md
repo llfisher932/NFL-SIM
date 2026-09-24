@@ -61,7 +61,8 @@ win and move both the team rating and the player projections.
    offseason changes.
 3. **Injuries and talent**: every position group's missing snap share shifts the ratings, with each
    player's snaps weighted by his contract (share of the cap vs his position's median) as a free
-   talent proxy. Effects are fit only on earlier games.
+   talent proxy. Each team is measured against that week's typical absences, so league-wide churn
+   (like week-1 offseason departures) moves no one. Effects are fit only on earlier games.
 4. **Situations**: week-18 starters on teams whose playoff seed is already locked (checked against
    every final-week outcome with the NFL tiebreakers) sit most of their snaps, as measured from
    2021-2025 snap counts; rest-day differences adjust home-field advantage.
@@ -75,14 +76,14 @@ win and move both the team rating and the player projections.
 
 | | Model | Market |
 |---|---|---|
-| Brier score | 0.2169 | 0.2095 |
-| Log loss | 0.6233 | 0.6075 |
-| Margin MAE | 9.80 | 9.54 |
-| Total MAE | 10.49 | 10.19 |
+| Brier score | 0.2167 | 0.2095 |
+| Log loss | 0.6228 | 0.6075 |
+| Margin MAE | 9.79 | 9.54 |
+| Total MAE | 10.48 | 10.19 |
 
-The market is still more accurate overall. Against the spread the model's side won 51.4% of games;
-on the 316 games where it disagreed with the line by 3+ points it won 56.7%, but only three of four
-seasons cleared the 52.4% break-even, so that is a lead, not proof.
+The market is still more accurate overall. Against the spread the model's side won 52.3% of games;
+on the 334 games where it disagreed with the line by 3+ points it won 57.2%, but 2025 finished at
+50%, so that is a lead, not proof. The dashboard's Record page tracks these situations.
 
 **Live tracker:** every refresh logs the model's number and the Vegas line for each game not yet
 kicked off. The last entry before kickoff is the pick, graded afterwards against that line and the

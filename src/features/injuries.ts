@@ -173,6 +173,23 @@ export function fitInjuryEffects(
   };
 }
 
+function median(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+// The typical team's absences in one week. Effects apply to differences from it, so league-wide
+// churn such as week-1 offseason departures moves no one; the median ignores a few resting teams.
+export function weekReference(absences: readonly Pick<TeamAbsence, "offense" | "defense" | "qbDelta">[]): InjuryEffects["baseline"] {
+  return {
+    offense: Object.fromEntries(OFFENSE_GROUPS.map((g) => [g, median(absences.map((a) => a.offense[g]))])) as Record<OffenseGroup, number>,
+    defense: Object.fromEntries(DEFENSE_GROUPS.map((g) => [g, median(absences.map((a) => a.defense[g]))])) as Record<DefenseGroup, number>,
+    qbDelta: median(absences.map((a) => a.qbDelta)),
+  };
+}
+
 export function applyInjuryEffects(features: TeamWeekFeatures, absence: TeamAbsence, effects: InjuryEffects): TeamWeekFeatures {
   const offenseShift =
     OFFENSE_GROUPS.reduce((s, g) => s + effects.offense[g] * (absence.offense[g] - effects.baseline.offense[g]), 0) +
@@ -417,12 +434,22 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
           residual: (g.passEpa + g.rushEpa) / plays - (offense.league.all + offense.offense.all + defense.defense.all),
           weight: plays,
           home,
-          offense: absenceAt(g.team, g).offense,
-          defense: absenceAt(g.opponent, g).defense,
+          offense: { ...absenceAt(g.team, g).offense },
+          defense: { ...absenceAt(g.opponent, g).defense },
           qbDelta: absenceAt(g.team, g).qbDelta,
         },
       ];
     });
+    const byWeek = new Map<string, InjuryObservation[]>();
+    for (const o of observations) pushTo(byWeek, `${o.season}:${o.week}`, o);
+    for (const week of byWeek.values()) {
+      const reference = weekReference(week);
+      for (const o of week) {
+        for (const g of OFFENSE_GROUPS) o.offense[g] -= reference.offense[g];
+        for (const g of DEFENSE_GROUPS) o.defense[g] -= reference.defense[g];
+        o.qbDelta -= reference.qbDelta;
+      }
+    }
     return observations;
   }
 
@@ -441,8 +468,8 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
     absenceAt,
     effectsAt,
     adjust(features, target) {
-      const effects = effectsAt(target);
       const absences = new Map([...features.keys()].map((team) => [team, absenceAt(team, target)]));
+      const effects = { ...effectsAt(target), baseline: weekReference([...absences.values()]) };
       return {
         effects,
         absences,

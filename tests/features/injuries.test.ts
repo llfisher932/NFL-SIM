@@ -8,6 +8,7 @@ import {
   createInjuryModel,
   DEFAULT_INJURY_CONFIG,
   fitInjuryEffects,
+  weekReference,
   type InjuryModelInputs,
   type InjuryObservation,
 } from "../../src/features/injuries";
@@ -157,6 +158,28 @@ describe("features/injuries", () => {
 
     it("leaves the other features alone", () => {
       expect(adjusted).toMatchObject({ playsPerGame: 64, league: features.league, offense: { pass: 0.15 } });
+    });
+  });
+
+  describe("weekReference", () => {
+    const team = (WR: number, DB: number, qbDelta = 0) => ({
+      offense: { QB: 0, RB: 0, WR, TE: 0, OL: 0 },
+      defense: { DL: 0, LB: 0, DB },
+      qbDelta,
+    });
+
+    it("takes the median team's absence in each group", () => {
+      const reference = weekReference([team(1, 0.5), team(2, 1.5), team(4, 1)]);
+      expect(reference.offense.WR).toBe(2);
+      expect(reference.defense.DB).toBe(1);
+    });
+
+    it("ignores a few extreme teams, like starters resting in week 18", () => {
+      expect(weekReference([team(0, 0), team(0, 0), team(0, 0), team(9, 9)]).offense.WR).toBe(0);
+    });
+
+    it("averages the middle two teams in an even week", () => {
+      expect(weekReference([team(1, 0, -0.1), team(3, 0, 0.1)]).qbDelta).toBeCloseTo(0, 9);
     });
   });
 
@@ -484,6 +507,11 @@ describe("features/injuries", () => {
     });
 
     describe("adjust", () => {
+      it("measures every team against the week's typical absences", () => {
+        const adjusted = build([report({ playerId: "00-000000Q", injuryStatus: "Out" })]).adjust(weekFeatures(), week5);
+        expect(adjusted.effects.baseline).toEqual(weekReference([...adjusted.absences.values()]));
+      });
+
       it("returns adjusted features and the absences behind them", () => {
         const adjusted = build([report({ playerId: "00-000000Q", injuryStatus: "Out" })]).adjust(weekFeatures(), week5);
         expect(adjusted.absences.get("BUF")!.qbDelta).toBeLessThan(-0.15);

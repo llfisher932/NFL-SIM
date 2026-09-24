@@ -5,6 +5,8 @@ Gridiron Sim: a Monte Carlo simulator for NFL games and player stats, built on f
 
 Every projection uses only information available before kickoff; walk-forward tests enforce it.
 
+**Live dashboard:** https://llfisher932.github.io/NFL-SIM/ (refreshed twice a week).
+
 ## Setup
 
 Requires Node 22+ and pnpm.
@@ -21,11 +23,12 @@ Raw files are cached in `data/raw/` and loaded into DuckDB at `data/nfl.duckdb` 
 | Command | What it does |
 |---|---|
 | `pnpm ingest --seasons 2021-2025 [--force]` | Download (once) and load play-by-play, schedules, player stats, injury reports, rosters, snap counts |
-| `pnpm refresh [--season 2026]` | Weekly update: re-download the current season, re-ingest, export the latest and next week |
+| `pnpm refresh [--season 2026] [--publish]` | Weekly update: re-download the current season, re-ingest, export the latest and next week, optionally publish |
 | `pnpm sim --season 2025 --week 5` | Game projections: win probability, score, spread and total ranges, injury shifts |
 | `pnpm players --season 2025 --week 5 [--team BUF]` | Player projections (mean and p10/p50/p90) |
 | `pnpm export --season 2025 --weeks 1-6` | Write dashboard JSON to `web/public/data` |
-| `pnpm dashboard` | Run the dashboard at http://localhost:5173 |
+| `pnpm dashboard` | Run the dashboard at http://localhost:5173 (`--host` to open it to your network) |
+| `pnpm dashboard:publish` | Build the dashboard and publish it to the `gh-pages` branch (GitHub Pages) |
 | `pnpm backtest` | Walk-forward backtest 2022-2025 vs the market |
 | `pnpm player-backtest --season 2024` | Score player projections against box scores |
 | `pnpm tune` | Feature and home-field tuning with held-out seasons |

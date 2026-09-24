@@ -9,6 +9,7 @@ import { weeksToRefresh } from "../dashboard/build";
 import { DEFAULT_SEED, DEFAULT_SIMS } from "../sim/config";
 import { cliErrorMessage, currentSeason, parseSeason, parseSeed, parseSims } from "./args";
 import { exportWeeks } from "./exportRunner";
+import { buildDashboard, publishDashboard } from "./publish";
 
 const FIRST_DATA_SEASON = 2021;
 
@@ -21,6 +22,7 @@ const { values } = parseArgs({
     overrides: { type: "string", default: DEFAULT_OVERRIDES_PATH },
     db: { type: "string", default: DEFAULT_DB_PATH },
     "raw-dir": { type: "string", default: DEFAULT_RAW_DIR },
+    publish: { type: "boolean", default: false },
   },
 });
 
@@ -64,6 +66,10 @@ async function main(): Promise<void> {
     dbPath: values.db,
     log: (line) => console.log(`  ${line.trim()}`),
   });
+  if (values.publish) {
+    await buildDashboard();
+    await publishDashboard((line) => console.log(`  ${line}`));
+  }
   console.log(`Done in ${((Date.now() - started.getTime()) / 1000).toFixed(0)}s`);
 }
 

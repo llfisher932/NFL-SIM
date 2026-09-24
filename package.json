@@ -11,6 +11,7 @@
     "refresh": "tsx src/cli/refresh.ts",
     "dashboard": "vite --config web/vite.config.ts",
     "dashboard:build": "vite build --config web/vite.config.ts",
+    "dashboard:publish": "tsx src/cli/publishRun.ts",
     "backtest": "tsx src/cli/backtest.ts",
     "player-backtest": "tsx src/cli/playerBacktest.ts",
     "tune": "tsx src/cli/tune.ts",

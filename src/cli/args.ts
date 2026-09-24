@@ -37,6 +37,15 @@ export function parseWeek(input: string | undefined): number {
   return weekSchema.parse(input);
 }
 
+const halfLifeSchema = z.coerce
+  .number({ error: "invalid half-life" })
+  .positive("invalid half-life")
+  .max(1000, "invalid half-life");
+
+export function parseHalfLife(input: string): number {
+  return halfLifeSchema.parse(input);
+}
+
 export function cliErrorMessage(err: unknown): string {
   if (err instanceof z.ZodError) return err.issues.map((issue) => issue.message).join("; ");
   return err instanceof Error ? err.message : String(err);

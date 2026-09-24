@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cliErrorMessage, parseSeason, parseSeasons, parseWeek } from "../../src/cli/args";
+import { cliErrorMessage, parseHalfLife, parseSeason, parseSeasons, parseWeek } from "../../src/cli/args";
 
 describe("cli/args", () => {
   describe("parseSeasons", () => {
@@ -57,6 +57,20 @@ describe("cli/args", () => {
 
     it("rejects a missing value", () => {
       expect(() => parseWeek(undefined)).toThrow("missing week");
+    });
+  });
+
+  describe("parseHalfLife", () => {
+    it("accepts fractional weeks", () => {
+      expect(parseHalfLife("6.5")).toBe(6.5);
+    });
+
+    it("rejects zero", () => {
+      expect(() => parseHalfLife("0")).toThrow("invalid half-life");
+    });
+
+    it("rejects non-numeric input", () => {
+      expect(() => parseHalfLife("fast")).toThrow("invalid half-life");
     });
   });
 

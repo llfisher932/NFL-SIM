@@ -4,6 +4,7 @@
   "description": "NFL game & player-stat Monte Carlo simulator",
   "scripts": {
     "ingest": "tsx src/cli/ingest.ts",
+    "features": "tsx src/cli/features.ts",
     "epa": "tsx src/cli/epa.ts",
     "test": "vitest run",
     "test:watch": "vitest",

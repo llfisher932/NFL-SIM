@@ -14,11 +14,14 @@ import {
   type PlayerRole,
   type PlayerSnap,
   type QbDropbacks,
+  type QbProfile,
   type TeamAbsence,
 } from "../types/injuries";
 import type { PlayerOverride } from "../types/players";
 import type { WeekGame } from "../types/sim";
+import { END_OF_SEASON_WEEK } from "./config";
 import { choleskySolve, zeros } from "./linalg";
+import { DEFAULT_QB_SKILL_CONFIG, createQbSkillModel } from "./qbSkill";
 import { lockedSeeds } from "./seeding";
 import { decayWeight, isBefore } from "./window";
 
@@ -36,8 +39,8 @@ export const DEFAULT_INJURY_CONFIG: InjuryConfig = {
     questionablePregame: 0.24,
   },
   ridge: 2000,
-  qbValueRidge: 20,
-  qbQuality: { priorDropbacks: 200, replacementBelowLeague: 0.12 },
+  qbDeltaRidge: 20,
+  qbSkill: DEFAULT_QB_SKILL_CONFIG,
   // Healthy regulars on locked teams played 41% of usual snaps in week 18 (2021-2025, 12 teams) vs 88% elsewhere.
   resting: { minRole: 0.5, share: { QB: 0.75, RB: 0.6, WR: 0.6, TE: 0.6, OL: 0.5, DL: 0.5, LB: 0.5, DB: 0.5 } },
 };
@@ -87,12 +90,15 @@ export interface InjuryObservation extends SeasonWeek {
   home: number;
   offense: Record<OffenseGroup, number>;
   defense: Record<DefenseGroup, number>;
-  qbValue: number;
+  qbDelta: number;
 }
 
 export interface InjuryModelInputs {
   snaps: readonly PlayerSnap[];
   qbDropbacks: readonly QbDropbacks[];
+  qbProfiles?: ReadonlyMap<string, QbProfile>;
+  // Relative worth of a player's snaps in a season (1 = average for his position).
+  talent?: (playerId: string, season: number) => number;
   availability: Availability;
   teamGames: readonly TeamGame[];
   games: readonly WeekGame[];
@@ -122,7 +128,7 @@ function pushTo<K, V>(map: Map<K, V[]>, k: K, v: V): void {
 export function fitInjuryEffects(
   observations: readonly InjuryObservation[],
   ridge: number,
-  qbValueRidge = ridge,
+  qbDeltaRidge = ridge,
 ): InjuryEffects {
   const groups = [...OFFENSE_GROUPS.map((g) => ["offense", g] as const), ...DEFENSE_GROUPS.map((g) => ["defense", g] as const)];
   const n = 3 + groups.length;
@@ -133,14 +139,14 @@ export function fitInjuryEffects(
       1,
       obs.home,
       ...groups.map(([side, g]) => (side === "offense" ? obs.offense[g as OffenseGroup] : obs.defense[g as DefenseGroup])),
-      obs.qbValue,
+      obs.qbDelta,
     ];
     for (let i = 0; i < n; i++) {
       b[i]! += obs.weight * obs.residual * x[i]!;
       for (let j = 0; j < n; j++) a[i]![j]! += obs.weight * x[i]! * x[j]!;
     }
   }
-  for (let i = 0; i < n; i++) a[i]![i]! += i < 2 ? 1e-6 : i === n - 1 ? qbValueRidge : ridge;
+  for (let i = 0; i < n; i++) a[i]![i]! += i < 2 ? 1e-6 : i === n - 1 ? qbDeltaRidge : ridge;
   const beta = choleskySolve(a, b);
   const offense = zeroOffense();
   const defense = zeroDefense();
@@ -154,14 +160,14 @@ export function fitInjuryEffects(
   const baseline = {
     offense: Object.fromEntries(OFFENSE_GROUPS.map((g) => [g, mean((o) => o.offense[g])])) as Record<OffenseGroup, number>,
     defense: Object.fromEntries(DEFENSE_GROUPS.map((g) => [g, mean((o) => o.defense[g])])) as Record<DefenseGroup, number>,
-    qbValue: mean((o) => o.qbValue),
+    qbDelta: mean((o) => o.qbDelta),
   };
   return {
     intercept: beta[0]!,
     home: beta[1]!,
     offense,
     defense,
-    qbValue: beta[n - 1]!,
+    qbDelta: beta[n - 1]!,
     baseline,
     observations: observations.length,
   };
@@ -170,7 +176,7 @@ export function fitInjuryEffects(
 export function applyInjuryEffects(features: TeamWeekFeatures, absence: TeamAbsence, effects: InjuryEffects): TeamWeekFeatures {
   const offenseShift =
     OFFENSE_GROUPS.reduce((s, g) => s + effects.offense[g] * (absence.offense[g] - effects.baseline.offense[g]), 0) +
-    effects.qbValue * (absence.qbValue - effects.baseline.qbValue);
+    effects.qbDelta * (absence.qbDelta - effects.baseline.qbDelta);
   const defenseShift = DEFENSE_GROUPS.reduce(
     (s, g) => s + effects.defense[g] * (absence.defense[g] - effects.baseline.defense[g]),
     0,
@@ -229,30 +235,40 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
     gameInfo.set(key(g.season, g.week, g.away), g);
   }
 
-  const dropbacksByQb = new Map<string, QbDropbacks[]>();
-  for (const d of inputs.qbDropbacks) pushTo(dropbacksByQb, d.playerId, d);
-  const replacementCache = new Map<string, number>();
-  function replacementLevel(target: SeasonWeek): number {
-    const cacheKey = `${target.season}:${target.week}`;
-    let level = replacementCache.get(cacheKey);
-    if (level === undefined) {
-      const rows = inputs.qbDropbacks.filter((d) => isBefore(d, target) && d.season >= target.season - 1);
-      const dropbacks = rows.reduce((s, d) => s + d.dropbacks, 0);
-      const league = dropbacks > 0 ? rows.reduce((s, d) => s + d.epa, 0) / dropbacks : 0;
-      level = league - config.qbQuality.replacementBelowLeague;
-      replacementCache.set(cacheKey, level);
-    }
-    return level;
+  const qbSkill = createQbSkillModel(inputs.qbDropbacks, inputs.qbProfiles ?? new Map(), config.qbSkill);
+  const qbsByTeamGame = new Map<string, QbDropbacks[]>();
+  for (const d of inputs.qbDropbacks) pushTo(qbsByTeamGame, key(d.season, d.week, d.team), d);
+
+  // Dropback-weighted skill, relative to league, of the QBs who played one team game.
+  function playedQbSkill(team: string, game: SeasonWeek, target: SeasonWeek): { skill: number; dropbacks: number } | null {
+    const rows = qbsByTeamGame.get(key(game.season, game.week, team)) ?? [];
+    const dropbacks = rows.reduce((s, d) => s + d.dropbacks, 0);
+    if (dropbacks === 0) return null;
+    const skill = rows.reduce((s, d) => s + d.dropbacks * qbSkill.skill(d.playerId, target), 0) / dropbacks;
+    return { skill: skill - qbSkill.league(target), dropbacks };
   }
 
-  // Regressed EPA per dropback above replacement, from dropbacks before the target only.
-  function qbValueAboveReplacement(playerId: string, target: SeasonWeek): number {
-    const rows = (dropbacksByQb.get(playerId) ?? []).filter((d) => isBefore(d, target) && d.season >= target.season - 1);
-    const replacement = replacementLevel(target);
-    const dropbacks = rows.reduce((s, d) => s + d.dropbacks, 0);
-    const epa = rows.reduce((s, d) => s + d.epa, 0);
-    const prior = config.qbQuality.priorDropbacks;
-    return Math.max(0, (epa + prior * replacement) / (dropbacks + prior) - replacement);
+  // QB quality the rating already contains: this season's QBs by decayed dropbacks, blended with
+  // last season's (as regressed into the prior) by the rating's current-season share.
+  function bakedQbSkill(team: string, target: SeasonWeek, currentShare: number): number {
+    const average = (games: readonly SeasonWeek[], weekOf: (g: SeasonWeek) => number) => {
+      let weight = 0;
+      let total = 0;
+      for (const g of games) {
+        const played = playedQbSkill(team, g, target);
+        if (!played) continue;
+        const w = decayWeight(weekOf(g), featureConfig.halfLifeWeeks) * played.dropbacks;
+        weight += w;
+        total += w * played.skill;
+      }
+      return weight > 0 ? total / weight : 0;
+    };
+    const games = teamGameOrder.get(team) ?? [];
+    const current = games.filter((g) => g.season === target.season && g.week < target.week);
+    const previous = games.filter((g) => g.season === target.season - 1);
+    const currentSkill = average(current, (g) => target.week - g.week - 1);
+    const priorSkill = featureConfig.retention.offense * average(previous, (g) => END_OF_SEASON_WEEK - g.week - 1);
+    return currentShare * currentSkill + (1 - currentShare) * priorSkill;
   }
 
   function rolesAt(team: string, target: SeasonWeek): PlayerRole[] {
@@ -285,6 +301,8 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
     return locked.has(team);
   }
 
+  const talentOf = inputs.talent ?? (() => 1);
+
   const absenceCache = new Map<string, TeamAbsence>();
   function absenceAt(team: string, target: SeasonWeek): TeamAbsence {
     const cacheKey = key(target.season, target.week, team);
@@ -302,10 +320,7 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
       else defense[group as DefenseGroup] += value;
     };
 
-    const qbValues = new Map(
-      roles.filter((r) => r.group === "QB").map((r) => [r.playerId, qbValueAboveReplacement(r.playerId, target)]),
-    );
-    let qbValue = 0;
+    const absent = new Map<string, number>();
     const missing: TeamAbsence["missing"] = [];
     const resting = seedLocked(team, target);
     for (const r of roles) {
@@ -318,12 +333,27 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
         probability = restShare;
         reason = "resting";
       }
+      absent.set(r.playerId, probability);
       if (probability > 0) {
-        add(r.group, r.role * probability);
-        qbValue += r.role * probability * (qbValues.get(r.playerId) ?? 0);
+        add(r.group, r.role * probability * talentOf(r.playerId, target.season));
         missing.push({ ...r, probability, reason });
       }
     }
+
+    const absenceOf = (playerId: string) =>
+      absent.get(playerId) ??
+      (inputs.availability.manualOuts?.has(`${target.season}:${target.week}:${playerId}`)
+        ? 1
+        : absenceProbability(reports.get(`${cacheKey}:${playerId}`), rosterPublished, gameday, config.absence));
+    const qbRoles = roles.filter((r) => r.group === "QB").sort((a, b) => b.role - a.role);
+    const listed = game ? (game.home === team ? game.homeQb : game.awayQb) : null;
+    const starter = listed ?? qbRoles[0]?.playerId ?? null;
+    const backup = qbRoles.find((r) => r.playerId !== starter && absenceOf(r.playerId) < 0.5);
+    const skillOf = (playerId: string | null | undefined) =>
+      playerId ? qbSkill.skill(playerId, target) : qbSkill.replacement(target);
+    const starterOut = starter ? absenceOf(starter) : 1;
+    const expectedQb = (1 - starterOut) * skillOf(starter) + starterOut * skillOf(backup?.playerId) - qbSkill.league(target);
+    let offenseShare = 0;
 
     const season = (teamGameOrder.get(team) ?? []).filter((g) => g.season === target.season && g.week < target.week);
     if (season.length > 0) {
@@ -332,7 +362,6 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
       let defensePlays = 0;
       const bakedOffense = zeroOffense();
       const bakedDefense = zeroDefense();
-      let bakedQbValue = 0;
       for (const g of season) {
         const w = decayWeight(target.week - g.week - 1, featureConfig.halfLifeWeeks);
         const p = plays.get(`${g.gameId}:${team}`) ?? { offense: 64, defense: 64 };
@@ -342,19 +371,28 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
         const present = gamePlayers.get(`${g.gameId}:${team}`) ?? new Set<string>();
         for (const r of roles) {
           if (present.has(r.playerId)) continue;
-          bakedQbValue += w * r.role * (qbValues.get(r.playerId) ?? 0);
-          if (r.group in bakedOffense) bakedOffense[r.group as OffenseGroup] += w * r.role;
-          else bakedDefense[r.group as DefenseGroup] += w * r.role;
+          const worth = w * r.role * talentOf(r.playerId, target.season);
+          if (r.group in bakedOffense) bakedOffense[r.group as OffenseGroup] += worth;
+          else bakedDefense[r.group as DefenseGroup] += worth;
         }
       }
-      const offenseShare = offensePlays / (offensePlays + featureConfig.priorPlays.offense.all);
+      offenseShare = offensePlays / (offensePlays + featureConfig.priorPlays.offense.all);
       const defenseShare = defensePlays / (defensePlays + featureConfig.priorPlays.defense.all);
       for (const g of OFFENSE_GROUPS) offense[g] -= (offenseShare * bakedOffense[g]) / weightSum;
       for (const g of DEFENSE_GROUPS) defense[g] -= (defenseShare * bakedDefense[g]) / weightSum;
-      qbValue -= (offenseShare * bakedQbValue) / weightSum;
     }
+    const qbDelta = expectedQb - bakedQbSkill(team, target, offenseShare);
 
-    const absence = { season: target.season, week: target.week, team, offense, defense, qbValue, missing };
+    const absence: TeamAbsence = {
+      season: target.season,
+      week: target.week,
+      team,
+      offense,
+      defense,
+      qbDelta,
+      expectedQb: { starter, backup: backup?.playerId ?? null, starterOut, skill: expectedQb },
+      missing,
+    };
     absenceCache.set(cacheKey, absence);
     return absence;
   }
@@ -381,7 +419,7 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
           home,
           offense: absenceAt(g.team, g).offense,
           defense: absenceAt(g.opponent, g).defense,
-          qbValue: absenceAt(g.team, g).qbValue,
+          qbDelta: absenceAt(g.team, g).qbDelta,
         },
       ];
     });
@@ -393,7 +431,7 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
     const cacheKey = `${target.season}:${target.week}`;
     let effects = effectsCache.get(cacheKey);
     if (!effects) {
-      effects = fitInjuryEffects(allObservations().filter((o) => isBefore(o, target)), config.ridge, config.qbValueRidge);
+      effects = fitInjuryEffects(allObservations().filter((o) => isBefore(o, target)), config.ridge, config.qbDeltaRidge);
       effectsCache.set(cacheKey, effects);
     }
     return effects;

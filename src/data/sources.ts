@@ -20,6 +20,7 @@ const ASSETS: Record<DatasetId, ReleaseAsset> = {
   snap_counts: { tag: "snap_counts", fileName: (s) => `snap_counts_${s}.parquet`, perSeason: true },
   weekly_rosters: { tag: "weekly_rosters", fileName: (s) => `roster_weekly_${s}.parquet`, perSeason: true },
   players: { tag: "players", fileName: () => "players.parquet", perSeason: false },
+  contracts: { tag: "contracts", fileName: () => "historical_contracts.parquet", perSeason: false },
 };
 
 function rawFile(dataset: DatasetId, season: number | null): RawFile {

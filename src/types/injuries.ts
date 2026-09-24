@@ -16,6 +16,7 @@ export interface PlayerSnap extends SeasonWeek {
 
 export interface QbDropbacks extends SeasonWeek {
   playerId: string;
+  team: string;
   dropbacks: number;
   epa: number;
 }
@@ -54,8 +55,10 @@ export interface TeamAbsence extends SeasonWeek {
   team: string;
   offense: Record<OffenseGroup, number>;
   defense: Record<DefenseGroup, number>;
-  // Missing QB quality: role x absence x EPA/dropback above replacement, net of what the rating absorbed.
-  qbValue: number;
+  // Expected QB's EPA/dropback minus the QB quality already baked into the team's rating.
+  qbDelta: number;
+  // Who the model expects at QB: the listed starter, his chance of missing, and the fallback.
+  expectedQb?: { starter: string | null; backup: string | null; starterOut: number; skill: number };
   missing: MissingPlayer[];
 }
 
@@ -64,9 +67,9 @@ export interface InjuryEffects {
   home: number;
   offense: Record<OffenseGroup, number>;
   defense: Record<DefenseGroup, number>;
-  qbValue: number;
+  qbDelta: number;
   // Average net missing role in the training games; adjustments are applied relative to it.
-  baseline: { offense: Record<OffenseGroup, number>; defense: Record<DefenseGroup, number>; qbValue: number };
+  baseline: { offense: Record<OffenseGroup, number>; defense: Record<DefenseGroup, number>; qbDelta: number };
   observations: number;
 }
 
@@ -79,14 +82,28 @@ export interface AbsenceProbabilities {
   questionablePregame: number;
 }
 
+export interface QbProfile {
+  draftRound: number | null;
+  rookieSeason: number | null;
+}
+
+export interface QbSkillConfig {
+  halfLifeGames: number;
+  priorDropbacks: number;
+  experiencedAfterSeasons: number;
+  // Prior EPA/dropback relative to league, by draft slot for young QBs.
+  offsets: { round1: number; round2to3: number; round4to7: number; undrafted: number; veteran: number };
+  replacement: number;
+}
+
 export interface InjuryConfig {
   lookbackGames: number;
   roleGames: number;
   minRole: number;
   absence: AbsenceProbabilities;
   ridge: number;
-  qbValueRidge: number;
-  qbQuality: { priorDropbacks: number; replacementBelowLeague: number };
+  qbDeltaRidge: number;
+  qbSkill: QbSkillConfig;
   // Share of snaps regulars sit in the final regular-season week when their playoff seed is locked.
   resting: { minRole: number; share: Record<PositionGroup, number> };
 }

@@ -47,6 +47,7 @@ export function buildMatchup(week: WeekFeatures, game: WeekGame): Matchup {
     neutralSite: game.neutralSite,
     postseason: game.gameType !== "REG",
     leaguePlaysPerGame: all.reduce((sum, f) => sum + f.playsPerGame, 0) / all.length,
+    ...(game.homeRest != null && game.awayRest != null ? { restDiff: game.homeRest - game.awayRest } : {}),
   };
 }
 

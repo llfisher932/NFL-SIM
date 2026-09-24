@@ -72,6 +72,13 @@ describe("web/components", () => {
       expect(html).toContain("Rams win probability");
     });
 
+    it("names the expected QB and whom he replaces", () => {
+      const withQb = game({ away: { ...game().away, qb: { name: "Mac Jones", skill: -0.12, starterOut: "Brock Purdy" } } });
+      const detail = text(renderToStaticMarkup(<GameDetail game={withQb} />));
+      expect(detail).toContain("Expected QB: Mac Jones (−0.12 EPA/dropback vs league average)");
+      expect(detail).toContain("in for Brock Purdy");
+    });
+
     it("explains why each player is missing", () => {
       expect(html).toContain("Brock Purdy");
       expect(html).toContain("Injured reserve");
@@ -103,6 +110,42 @@ describe("web/components", () => {
       expect(html).toContain("0.2185");
       expect(html).toContain("Market 0.2095");
       expect(html).toContain("51.8%");
+    });
+
+    it("shows the live pick record when picks are tracked", () => {
+      const line = (minGap: number, wins: number, losses: number) => ({ minGap, picks: wins + losses, wins, losses, pushes: 0, averageClv: 0.4 });
+      const tracker = {
+        season: 2026,
+        spread: [line(0, 12, 9), line(3, 5, 3), line(5, 2, 1)],
+        total: [line(0, 10, 11), line(3, 3, 4), line(5, 1, 1)],
+        picks: [
+          {
+            gameId: "2026_03_TEN_NYG",
+            season: 2026,
+            week: 3,
+            home: "NYG",
+            away: "TEN",
+            kickoff: "2026-09-27T13:00",
+            capturedAt: "2026-09-26T11:00:00.000Z",
+            started: true,
+            modelMargin: 3.4,
+            modelTotal: 46.4,
+            spread: { side: "NYG", gap: 0.9, line: 2.5, closingLine: 3, clv: 0.5, result: "win" as const },
+            total: { side: "over", gap: 7.9, line: 38.5, closingLine: 39, clv: 0.5, result: "loss" as const },
+            final: { home: 24, away: 20 },
+          },
+        ],
+      };
+      const html = text(renderToStaticMarkup(<RecordView record={{ ...record(), tracker }} />));
+      expect(html).toContain("2026 live picks");
+      expect(html).toContain("12–9 (57.1%)");
+      expect(html).toContain("5+ pt disagreements: 2–1");
+      expect(html).toContain("TEN @ NYG");
+    });
+
+    it("explains an empty live record", () => {
+      const tracker = { season: 2026, spread: [], total: [], picks: [] };
+      expect(text(renderToStaticMarkup(<RecordView record={{ ...record(), tracker }} />))).toContain("No picks logged yet");
     });
   });
 });

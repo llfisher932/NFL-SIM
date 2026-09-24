@@ -1,5 +1,6 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
-import type { Availability, PlayerSnap, PositionGroup, QbDropbacks } from "../types/injuries";
+import type { PlayerContract } from "../features/talent";
+import type { Availability, PlayerSnap, PositionGroup, QbDropbacks, QbProfile } from "../types/injuries";
 
 const GROUP_BY_POSITION: Record<string, PositionGroup> = {
   QB: "QB",
@@ -92,18 +93,45 @@ export async function loadAvailability(connection: DuckDBConnection): Promise<Av
 
 export async function loadQbDropbacks(connection: DuckDBConnection): Promise<QbDropbacks[]> {
   const reader = await connection.runAndReadAll(
-    `SELECT season, week, id AS player_id, count(*)::INTEGER AS dropbacks, sum(qb_epa) AS epa
+    `SELECT season, week, id AS player_id, posteam AS team, count(*)::INTEGER AS dropbacks, sum(qb_epa) AS epa
      FROM pbp
-     WHERE qb_dropback = 1 AND id IS NOT NULL AND qb_epa IS NOT NULL
-     GROUP BY season, week, id
-     ORDER BY season, week, id`,
+     WHERE qb_dropback = 1 AND id IS NOT NULL AND qb_epa IS NOT NULL AND posteam IS NOT NULL
+     GROUP BY season, week, id, posteam
+     ORDER BY season, week, id, posteam`,
   );
   return reader.getRowObjectsJS().map((row) => ({
     playerId: String(row["player_id"]),
+    team: String(row["team"]),
     season: Number(row["season"]),
     week: Number(row["week"]),
     dropbacks: Number(row["dropbacks"]),
     epa: Number(row["epa"]),
+  }));
+}
+
+export async function loadQbProfiles(connection: DuckDBConnection): Promise<Map<string, QbProfile>> {
+  const reader = await connection.runAndReadAll(
+    "SELECT gsis_id, draft_round, rookie_season FROM players WHERE position = 'QB' AND gsis_id IS NOT NULL",
+  );
+  const number = (value: unknown) => (value === null || value === undefined ? null : Number(value));
+  return new Map(
+    reader.getRowObjectsJS().map((row) => [
+      String(row["gsis_id"]),
+      { draftRound: number(row["draft_round"]), rookieSeason: number(row["rookie_season"]) },
+    ]),
+  );
+}
+
+export async function loadContracts(connection: DuckDBConnection): Promise<PlayerContract[]> {
+  const reader = await connection.runAndReadAll(
+    `SELECT gsis_id, year_signed, apy_cap_pct FROM contracts
+     WHERE gsis_id IS NOT NULL AND apy_cap_pct > 0
+     ORDER BY gsis_id, year_signed`,
+  );
+  return reader.getRowObjectsJS().map((row) => ({
+    playerId: String(row["gsis_id"]),
+    yearSigned: Number(row["year_signed"]),
+    apyCapPct: Number(row["apy_cap_pct"]),
   }));
 }
 

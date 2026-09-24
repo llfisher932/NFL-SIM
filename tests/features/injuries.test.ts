@@ -69,13 +69,13 @@ describe("features/injuries", () => {
     const observations: InjuryObservation[] = Array.from({ length: 400 }, (_, i) => {
       const offense = { QB: random() < 0.15 ? 1 : 0, RB: random(), WR: 2 * random(), TE: random(), OL: 3 * random() };
       const defense = { DL: 2 * random(), LB: random(), DB: 2 * random() };
-      const qbValue = offense.QB * 0.2 * random();
+      const qbDelta = offense.QB * 0.2 * random();
       const residual =
         0.01 -
-        0.3 * qbValue +
+        0.3 * qbDelta +
         (Object.keys(offense) as (keyof typeof offense)[]).reduce((s, g) => s + truth[g] * offense[g], 0) +
         (Object.keys(defense) as (keyof typeof defense)[]).reduce((s, g) => s + truth[g] * defense[g], 0);
-      return { season: 2024, week: 1, residual, weight: 60, home: i % 2 === 0 ? 1 : -1, offense, defense, qbValue };
+      return { season: 2024, week: 1, residual, weight: 60, home: i % 2 === 0 ? 1 : -1, offense, defense, qbDelta };
     });
     const effects = fitInjuryEffects(observations, 1e-6);
 
@@ -86,7 +86,7 @@ describe("features/injuries", () => {
     });
 
     it("recovers the extra cost of losing a better quarterback", () => {
-      expect(effects.qbValue).toBeCloseTo(-0.3, 6);
+      expect(effects.qbDelta).toBeCloseTo(-0.3, 6);
     });
 
     it("recovers the intercept", () => {
@@ -125,7 +125,7 @@ describe("features/injuries", () => {
       team: "BUF",
       offense: { QB: 1, RB: 0, WR: 0.5, TE: 0, OL: 0 },
       defense: { DL: 0, LB: 0, DB: 2 },
-      qbValue: 0.1,
+      qbDelta: 0.1,
       missing: [],
     };
     const effects = {
@@ -133,8 +133,8 @@ describe("features/injuries", () => {
       home: 0,
       offense: { QB: -0.1, RB: 0, WR: -0.02, TE: 0, OL: 0 },
       defense: { DL: 0, LB: 0, DB: 0.02 },
-      qbValue: -0.3,
-      baseline: { offense: { QB: 0, RB: 0, WR: 0, TE: 0, OL: 0 }, defense: { DL: 0, LB: 0, DB: 0 }, qbValue: 0 },
+      qbDelta: -0.3,
+      baseline: { offense: { QB: 0, RB: 0, WR: 0, TE: 0, OL: 0 }, defense: { DL: 0, LB: 0, DB: 0 }, qbDelta: 0 },
       observations: 1,
     };
     const adjusted = applyInjuryEffects(features, absence, effects);
@@ -187,7 +187,7 @@ describe("features/injuries", () => {
       team: "BUF",
       offense: { QB: 0, RB: 0, WR: 0, TE: 0, OL: 0 },
       defense: { DL: 0, LB: 0, DB: 0 },
-      qbValue: 0,
+      qbDelta: 0,
       missing: [
         { playerId: "00-0000001", group: "WR", role: 0.8, probability: 1, reason: "out" },
         { playerId: "00-0000002", group: "RB", role: 0.5, probability: 0.24, reason: "questionable" },
@@ -267,9 +267,9 @@ describe("features/injuries", () => {
     });
     const weekFeatures = () => new Map([["BUF", features("BUF")], ["KC", features("KC")]]);
 
-    const dropbacks = (playerId: string, epaPerDropback: number) =>
-      weeks.map((week) => ({ season: 2024, week, playerId, dropbacks: 35, epa: 35 * epaPerDropback }));
-    const qbDropbacks = [...dropbacks("00-000000Q", 0.25), ...dropbacks("00-000000K", 0.0)];
+    const dropbacks = (playerId: string, epaPerDropback: number, team = "BUF", perGame = 35) =>
+      weeks.map((week) => ({ season: 2024, week, playerId, team, dropbacks: perGame, epa: perGame * epaPerDropback }));
+    const qbDropbacks = [...dropbacks("00-000000Q", 0.25), ...dropbacks("00-000000K", 0.0, "KC")];
 
     function build(
       reports: AvailabilityReport[],
@@ -293,7 +293,7 @@ describe("features/injuries", () => {
     }
     const week5: SeasonWeek = { season: 2024, week: 5 };
 
-    it("counts a starting QB ruled out as a full missing QB, less what the rating already absorbed", () => {
+    it("counts a starting QB ruled out as missing snaps as well as a QB delta", () => {
       const absence = build([report({ playerId: "00-000000Q", injuryStatus: "Out" })]).absenceAt("BUF", week5);
       expect(absence.offense.QB).toBeCloseTo(1, 9);
       expect(absence.missing.map((m) => m.playerId)).toEqual(["00-000000Q"]);
@@ -301,7 +301,7 @@ describe("features/injuries", () => {
 
     it("counts a QB ruled out by hand as missing even when the report lists him healthy", () => {
       const absence = build([], baseSnaps, [], qbDropbacks, ["2024:5:00-000000Q"]).absenceAt("BUF", week5);
-      expect(absence.offense.QB).toBeCloseTo(1, 9);
+      expect(absence.qbDelta).toBeLessThan(-0.15);
     });
 
     it("labels a manual out as ruled out", () => {
@@ -365,21 +365,57 @@ describe("features/injuries", () => {
       });
     });
 
-    it("values a missing QB by his EPA per dropback above replacement", () => {
-      const absence = build([report({ playerId: "00-000000Q", injuryStatus: "Out" })]).absenceAt("BUF", week5);
-      expect(absence.qbValue).toBeGreaterThan(0.1);
-    });
-
-    it("values a missing QB less when he has been worse", () => {
+    describe("QB delta", () => {
       const out = [report({ playerId: "00-000000Q", injuryStatus: "Out" })];
-      const weaker = [...dropbacks("00-000000Q", 0.05), ...dropbacks("00-000000K", 0.0)];
-      expect(build(out, baseSnaps, [], weaker).absenceAt("BUF", week5).qbValue).toBeLessThan(
-        build(out).absenceAt("BUF", week5).qbValue,
-      );
-    });
 
-    it("has no QB value to lose when nobody is out", () => {
-      expect(build([]).absenceAt("BUF", week5).qbValue).toBe(0);
+      it("drops to replacement level when the only QB is ruled out", () => {
+        expect(build(out).absenceAt("BUF", week5).qbDelta).toBeLessThan(-0.15);
+      });
+
+      it("costs less when the missing QB has been worse", () => {
+        const weaker = [...dropbacks("00-000000Q", 0.05), ...dropbacks("00-000000K", 0.0, "KC")];
+        expect(build(out, baseSnaps, [], weaker).absenceAt("BUF", week5).qbDelta).toBeGreaterThan(
+          build(out).absenceAt("BUF", week5).qbDelta,
+        );
+      });
+
+      it("credits a playing starter only for the quality the rating has not yet absorbed", () => {
+        const delta = build([]).absenceAt("BUF", week5).qbDelta;
+        expect(delta).toBeGreaterThan(0);
+        expect(delta).toBeLessThan(0.05);
+      });
+
+      it("uses the backup's own record when the starter is out", () => {
+        const withBackup = [...baseSnaps, snap(4, "00-000000B", "QB", 0.1)];
+        const backupDropbacks = [...qbDropbacks, ...dropbacks("00-000000B", 0.1, "BUF", 10)];
+        expect(build(out, withBackup, [], backupDropbacks).absenceAt("BUF", week5).qbDelta).toBeGreaterThan(
+          build(out).absenceAt("BUF", week5).qbDelta,
+        );
+      });
+
+      it("uses the schedule's listed starter", () => {
+        const listed: WeekGame = {
+          gameId: "2024_05_KC_BUF",
+          season: 2024,
+          week: 5,
+          gameType: "REG",
+          kickoff: null,
+          home: "BUF",
+          away: "KC",
+          neutralSite: false,
+          spreadLine: null,
+          totalLine: null,
+          homeMoneyline: null,
+          awayMoneyline: null,
+          homeScore: null,
+          awayScore: null,
+          homeQb: "00-000000N",
+          awayQb: "00-000000K",
+        };
+        expect(build([], baseSnaps, [], qbDropbacks, [], [listed]).absenceAt("BUF", week5).qbDelta).toBeLessThan(
+          build([]).absenceAt("BUF", week5).qbDelta,
+        );
+      });
     });
 
     it("ignores players who now play for another team", () => {
@@ -405,6 +441,22 @@ describe("features/injuries", () => {
       expect(absence.offense.QB).toBe(0);
     });
 
+    it("weights a missing player's snaps by his talent", () => {
+      const out = [report({ team: "KC", playerId: "00-000000D", injuryStatus: "Out" })];
+      const model = createInjuryModel({
+        snaps: baseSnaps,
+        qbDropbacks,
+        availability: { reports: out, rosterTeamWeeks: new Set() },
+        talent: (playerId) => (playerId === "00-000000D" ? 2 : 1),
+        teamGames,
+        games,
+        weekFeatures,
+        featureConfig: DEFAULT_FEATURE_CONFIG,
+        config: DEFAULT_INJURY_CONFIG,
+      });
+      expect(model.absenceAt("KC", week5).defense.DL).toBeCloseTo(1.6, 9);
+    });
+
     it("assigns defensive players to the defense", () => {
       const absence = build([report({ team: "KC", playerId: "00-000000D", injuryStatus: "Out" })]).absenceAt("KC", week5);
       expect(absence.defense.DL).toBeCloseTo(0.8, 9);
@@ -424,7 +476,7 @@ describe("features/injuries", () => {
           report({ playerId: "00-000000Q", injuryStatus: "Out" }),
           report({ week: 6, playerId: "00-000000W", injuryStatus: "Out" }),
         ];
-        const futureDropbacks = [...qbDropbacks, { season: 2024, week: 5, playerId: "00-000000Q", dropbacks: 50, epa: -40 }];
+        const futureDropbacks = [...qbDropbacks, { season: 2024, week: 5, playerId: "00-000000Q", team: "BUF", dropbacks: 50, epa: -40 }];
         const poisoned = build(futureReports, futureSnaps, [], futureDropbacks);
         expect(poisoned.absenceAt("BUF", week5)).toEqual(clean.absenceAt("BUF", week5));
         expect(poisoned.effectsAt(week5)).toEqual(clean.effectsAt(week5));
@@ -434,7 +486,7 @@ describe("features/injuries", () => {
     describe("adjust", () => {
       it("returns adjusted features and the absences behind them", () => {
         const adjusted = build([report({ playerId: "00-000000Q", injuryStatus: "Out" })]).adjust(weekFeatures(), week5);
-        expect(adjusted.absences.get("BUF")!.offense.QB).toBeCloseTo(1, 9);
+        expect(adjusted.absences.get("BUF")!.qbDelta).toBeLessThan(-0.15);
         expect([...adjusted.features.keys()]).toEqual(["BUF", "KC"]);
       });
     });

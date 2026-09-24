@@ -44,8 +44,13 @@ interface PeriodRules {
   secondsAfter: number;
 }
 
-export function matchupEpa(matchup: Matchup, offense: Side, homeFieldEpa: number): number {
-  const hfa = matchup.neutralSite ? 0 : homeFieldEpa;
+export function restEdgeEpa(matchup: Matchup, config: Pick<SimConfig, "restEpaPerDay" | "restCapDays">): number {
+  const diff = Math.max(-config.restCapDays, Math.min(config.restCapDays, matchup.restDiff ?? 0));
+  return config.restEpaPerDay * diff;
+}
+
+export function matchupEpa(matchup: Matchup, offense: Side, homeFieldEpa: number, restEpa = 0): number {
+  const hfa = (matchup.neutralSite ? 0 : homeFieldEpa) + restEpa;
   return offense === "home"
     ? matchup.home.offense + matchup.away.defense + hfa
     : matchup.away.offense + matchup.home.defense - hfa;
@@ -73,7 +78,7 @@ function playPeriod(
     possessed[offense] = true;
     const defense = other(offense);
     const gameState = { scoreDiff: state.score[offense] - state.score[defense], gameSecondsLeft: clock + rules.secondsAfter };
-    const probabilities = model.outcomeProbabilities(start, matchupEpa(matchup, offense, config.homeFieldEpa), clock, gameState);
+    const probabilities = model.outcomeProbabilities(start, matchupEpa(matchup, offense, config.homeFieldEpa, restEdgeEpa(matchup, config)), clock, gameState);
     const outcome = DRIVE_OUTCOMES[sampleIndex(probabilities, rng)]!;
     const drive = model.sampleDrive(outcome, start, clock, paceScale[offense], rng, gameState);
     if (outcome === "end_of_half") {

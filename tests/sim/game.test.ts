@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SIM_CONFIG } from "../../src/sim/config";
 import type { DriveModel } from "../../src/sim/driveModel";
-import { matchupEpa, simulateGame } from "../../src/sim/game";
+import { matchupEpa, restEdgeEpa, simulateGame } from "../../src/sim/game";
 import { createRng } from "../../src/sim/rng";
 import { DRIVE_OUTCOMES, type DriveOutcome, type GameState, type Matchup } from "../../src/types/sim";
 
@@ -57,7 +57,36 @@ const evenMatchup: Matchup = {
 const config = { ...DEFAULT_SIM_CONFIG, homeFieldEpa: 0.02 };
 
 describe("sim/game", () => {
+  describe("restEdgeEpa", () => {
+    const restConfig = { restEpaPerDay: 0.002, restCapDays: 7 };
+
+    it("gives the home side an edge per day of extra rest", () => {
+      expect(restEdgeEpa({ ...evenMatchup, restDiff: 3 }, restConfig)).toBeCloseTo(0.006, 9);
+    });
+
+    it("penalizes the home side for less rest", () => {
+      expect(restEdgeEpa({ ...evenMatchup, restDiff: -4 }, restConfig)).toBeCloseTo(-0.008, 9);
+    });
+
+    it("caps the rest difference", () => {
+      expect(restEdgeEpa({ ...evenMatchup, restDiff: 13 }, restConfig)).toBeCloseTo(0.014, 9);
+    });
+
+    it("is zero without rest information", () => {
+      expect(restEdgeEpa(evenMatchup, restConfig)).toBe(0);
+    });
+  });
+
   describe("matchupEpa", () => {
+    it("adds the rest edge to the home side and takes it from the away side", () => {
+      expect(matchupEpa(evenMatchup, "home", 0.02, 0.006)).toBeCloseTo(0.05 + 0.03 + 0.026);
+      expect(matchupEpa(evenMatchup, "away", 0.02, 0.006)).toBeCloseTo(-0.01 - 0.02 - 0.026);
+    });
+
+    it("applies the rest edge at a neutral site", () => {
+      expect(matchupEpa({ ...evenMatchup, neutralSite: true }, "home", 0.02, 0.006)).toBeCloseTo(0.086);
+    });
+
     it("adds home-field advantage to the home offense", () => {
       expect(matchupEpa(evenMatchup, "home", 0.02)).toBeCloseTo(0.05 + 0.03 + 0.02);
     });

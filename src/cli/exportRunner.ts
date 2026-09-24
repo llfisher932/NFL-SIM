@@ -11,6 +11,7 @@ import {
 import { DEFAULT_DB_PATH, openDatabase } from "../data/db";
 import { loadConversionCounts, loadDrives, loadSeasonGames } from "../data/drives";
 import { DEFAULT_OVERRIDES_PATH, loadOverrides } from "../data/overrides";
+import { appendPickSnapshots, loadPickSnapshots } from "../data/pickLog";
 import { loadPlayerGames } from "../data/playerGames";
 import { loadTeamGames } from "../data/teamGames";
 import { buildDashboardGame, buildRecord, indexEntry, mergeIndex, weekFileName } from "../dashboard/build";
@@ -24,7 +25,9 @@ import { fitDriveModel } from "../sim/driveModel";
 import { buildMatchup, createWeekFeatureCache, ratingLookupFrom, teamsBySeason } from "../sim/matchups";
 import { projectGame } from "../sim/monteCarlo";
 import { hashSeed } from "../sim/rng";
+import { hasStarted, trackerReport, trackPicks } from "../eval/tracker";
 import type { DashboardIndexEntry, DashboardWeek } from "../types/dashboard";
+import type { PickSnapshot } from "../types/tracker";
 import { loadInjuryInputs, mergeOverrides } from "./injuryContext";
 
 
@@ -76,6 +79,8 @@ export async function exportWeeks(options: ExportOptions): Promise<void> {
     : null;
 
   const entries: DashboardIndexEntry[] = [];
+  const now = new Date();
+  const snapshots: PickSnapshot[] = [];
   for (const week of weeks) {
     const target = { season, week };
     const games = data.games.filter((g) => g.season === season && g.week === week);
@@ -103,6 +108,30 @@ export async function exportWeeks(options: ExportOptions): Promise<void> {
       seed,
     });
 
+    const projections = new Map(
+      games.map((game) => [
+        game.gameId,
+        projectGame(model, buildMatchup(features, game), DEFAULT_SIM_CONFIG, sims, hashSeed(seed, game.gameId)),
+      ]),
+    );
+    for (const game of games) {
+      if (hasStarted(game, now)) continue;
+      const projection = projections.get(game.gameId)!;
+      snapshots.push({
+        gameId: game.gameId,
+        season,
+        week,
+        capturedAt: now.toISOString(),
+        home: game.home,
+        away: game.away,
+        modelHomeWinProb: projection.homeWinProb,
+        modelMargin: projection.margin.mean,
+        modelTotal: projection.total.mean,
+        spreadLine: game.spreadLine,
+        totalLine: game.totalLine,
+      });
+    }
+
     const dashboardWeek: DashboardWeek = {
       season,
       week,
@@ -113,7 +142,7 @@ export async function exportWeeks(options: ExportOptions): Promise<void> {
       games: games.map((game) =>
         buildDashboardGame({
           game,
-          projection: projectGame(model, buildMatchup(features, game), DEFAULT_SIM_CONFIG, sims, hashSeed(seed, game.gameId)),
+          projection: projections.get(game.gameId)!,
           players: players.filter((p) => p.gameId === game.gameId),
           ratings: { home: features.get(game.home)!, away: features.get(game.away)! },
           baseline: { home: baseline.get(game.home)!, away: baseline.get(game.away)! },
@@ -127,9 +156,20 @@ export async function exportWeeks(options: ExportOptions): Promise<void> {
     log(`  ${season} week ${week}: ${games.length} games, ${players.length} players (${((Date.now() - started) / 1000).toFixed(1)}s)`);
   }
 
+  const logDb = await openDatabase(options.dbPath);
+  let logged: PickSnapshot[];
+  try {
+    if (snapshots.length > 0) await appendPickSnapshots(logDb.connection, snapshots);
+    logged = await loadPickSnapshots(logDb.connection);
+  } finally {
+    logDb.close();
+  }
+  const tracker = trackerReport(season, trackPicks(logged, data.games, now));
+  log(`  pick log: ${snapshots.length} new snapshot(s), ${tracker.picks.length} tracked pick(s) this season`);
+
   let record: string | null = null;
   if (data.backtest && data.backtest.length > 0) {
-    await writeDashboardRecord(options.out, buildRecord(data.backtest, new Date().toISOString()));
+    await writeDashboardRecord(options.out, buildRecord(data.backtest, now.toISOString(), tracker));
     record = RECORD_FILE;
     log(`  model record: ${data.backtest.length} backtest predictions`);
   }

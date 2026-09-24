@@ -145,12 +145,12 @@ describe("data/drives", () => {
     beforeEach(async () => {
       await db.connection.run(`
         CREATE TABLE schedules AS SELECT * FROM (VALUES
-          ('2025_05_MIN_CLE', 2025, 5, 'REG', '2025-10-05', '09:30', 'CLE', 'MIN', 'Neutral', -3.5, 35.5, 150, -180, 17, 21),
-          ('2025_05_SF_LA',   2025, 5, 'REG', '2025-10-02', '20:15', 'LA',  'SF',  'Home',     8.5, 43.5, -400, 310, NULL, NULL),
-          ('2025_06_X_Y',     2025, 6, 'REG', '2025-10-12', '13:00', 'Y',   'X',   'Home',     1.0, 44.0, NULL, NULL, NULL, NULL),
-          ('2024_01_X_Y',     2024, 1, 'REG', '2024-09-08', '13:00', 'Y',   'X',   'Home',     1.0, 44.0, NULL, NULL, 20, 10)
+          ('2025_05_MIN_CLE', 2025, 5, 'REG', '2025-10-05', '09:30', 'CLE', 'MIN', 'Neutral', -3.5, 35.5, 150, -180, 17, 21, NULL, NULL, 7, 7),
+          ('2025_05_SF_LA',   2025, 5, 'REG', '2025-10-02', '20:15', 'LA',  'SF',  'Home',     8.5, 43.5, -400, 310, NULL, NULL, '00-0000010', '00-0000020', 7, 7),
+          ('2025_06_X_Y',     2025, 6, 'REG', '2025-10-12', '13:00', 'Y',   'X',   'Home',     1.0, 44.0, NULL, NULL, NULL, NULL, NULL, NULL, 7, 7),
+          ('2024_01_X_Y',     2024, 1, 'REG', '2024-09-08', '13:00', 'Y',   'X',   'Home',     1.0, 44.0, NULL, NULL, 20, 10, NULL, NULL, 7, 7)
         ) AS t(game_id, season, week, game_type, gameday, gametime, home_team, away_team, location,
-               spread_line, total_line, home_moneyline, away_moneyline, home_score, away_score)`);
+               spread_line, total_line, home_moneyline, away_moneyline, home_score, away_score, home_qb_id, away_qb_id, home_rest, away_rest)`);
     });
 
     it("returns the week's games in kickoff order", async () => {
@@ -168,6 +168,16 @@ describe("data/drives", () => {
       expect(london).toMatchObject({ homeMoneyline: 150, awayMoneyline: -180 });
     });
 
+    it("keeps the listed starting QBs", async () => {
+      const [upcoming] = await loadWeekGames(db.connection, 2025, 5);
+      expect(upcoming).toMatchObject({ homeQb: "00-0000010", awayQb: "00-0000020" });
+    });
+
+    it("keeps each team's days of rest", async () => {
+      const [upcoming] = await loadWeekGames(db.connection, 2025, 5);
+      expect(upcoming).toMatchObject({ homeRest: 7, awayRest: 7 });
+    });
+
     it("leaves scores null for unplayed games", async () => {
       const [upcoming] = await loadWeekGames(db.connection, 2025, 5);
       expect(upcoming).toMatchObject({ homeScore: null, awayScore: null, neutralSite: false });
@@ -178,12 +188,12 @@ describe("data/drives", () => {
     beforeEach(async () => {
       await db.connection.run(`
         CREATE TABLE schedules AS SELECT * FROM (VALUES
-          ('2025_01_A_B', 2025, 1, 'REG', '2025-09-07', '13:00', 'B', 'A', 'Home', 1.0, 44.0, -120, 100, 20, 17),
-          ('2024_19_C_D', 2024, 19, 'WC', '2025-01-11', '16:30', 'D', 'C', 'Home', 3.0, 45.0, -160, 135, 24, 21),
-          ('2024_01_E_F', 2024, 1, 'REG', '2024-09-08', '13:00', 'F', 'E', 'Home', 2.0, 40.0, -130, 110, 13, 10),
-          ('2023_01_G_H', 2023, 1, 'REG', '2023-09-10', '13:00', 'H', 'G', 'Home', 2.0, 40.0, -130, 110, 13, 10)
+          ('2025_01_A_B', 2025, 1, 'REG', '2025-09-07', '13:00', 'B', 'A', 'Home', 1.0, 44.0, -120, 100, 20, 17, NULL, NULL, 7, 7),
+          ('2024_19_C_D', 2024, 19, 'WC', '2025-01-11', '16:30', 'D', 'C', 'Home', 3.0, 45.0, -160, 135, 24, 21, NULL, NULL, 7, 7),
+          ('2024_01_E_F', 2024, 1, 'REG', '2024-09-08', '13:00', 'F', 'E', 'Home', 2.0, 40.0, -130, 110, 13, 10, NULL, NULL, 7, 7),
+          ('2023_01_G_H', 2023, 1, 'REG', '2023-09-10', '13:00', 'H', 'G', 'Home', 2.0, 40.0, -130, 110, 13, 10, NULL, NULL, 7, 7)
         ) AS t(game_id, season, week, game_type, gameday, gametime, home_team, away_team, location,
-               spread_line, total_line, home_moneyline, away_moneyline, home_score, away_score)`);
+               spread_line, total_line, home_moneyline, away_moneyline, home_score, away_score, home_qb_id, away_qb_id, home_rest, away_rest)`);
     });
 
     it("returns every game of the requested seasons in chronological order", async () => {

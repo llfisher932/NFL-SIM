@@ -8,6 +8,10 @@ export const DEFAULT_SIM_CONFIG: SimConfig = {
   // ~1.8 points of home margin. Swept 0-0.03 (pnpm tune --stage hfa): 0.015 and 0.02 tied on
   // 2022-2023; 0.015 was better on every metric for held-out 2024-2025.
   homeFieldEpa: 0.015,
+  // 0.23 points per day of rest advantage (2022-2025 margin residuals, leave-one-season-out CV;
+  // byes, short weeks and time-zone travel added nothing beyond it) at ~116 points per EPA/play.
+  restEpaPerDay: 0.002,
+  restCapDays: 7,
   priorTrainingSeasons: 3,
   minTrainingDrives: 2000,
   neighbors: 40,

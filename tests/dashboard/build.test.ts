@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDashboardGame,
+  expectedQb,
   buildRecord,
   indexEntry,
   listAbsences,
@@ -68,7 +69,7 @@ const absence: TeamAbsence = {
   team: "SF",
   offense: { QB: 1, RB: 0, WR: 0, TE: 0, OL: 0 },
   defense: { DL: 0, LB: 0, DB: 0 },
-  qbValue: 0.1,
+  qbDelta: 0.1,
   missing: [
     { playerId: "00-0000001", group: "QB", role: 0.97, probability: 1, reason: "out" },
     { playerId: "00-0000002", group: "OL", role: 0.1, probability: 1, reason: "inactive" },
@@ -112,6 +113,31 @@ const inputs: GameInputs = {
 };
 
 describe("dashboard/build", () => {
+  describe("expectedQb", () => {
+    const names = new Map([["00-0000001", "Brock Purdy"], ["00-0000009", "Mac Jones"]]);
+    const withQb = (starterOut: number): TeamAbsence => ({
+      ...absence,
+      expectedQb: { starter: "00-0000001", backup: "00-0000009", starterOut, skill: -0.12 },
+    });
+
+    it("names the listed starter when he is expected to play", () => {
+      expect(expectedQb(withQb(0.1), names)).toEqual({ name: "Brock Purdy", skill: -0.12, starterOut: null });
+    });
+
+    it("names the backup and the starter he replaces when the starter is likely out", () => {
+      expect(expectedQb(withQb(1), names)).toEqual({ name: "Mac Jones", skill: -0.12, starterOut: "Brock Purdy" });
+    });
+
+    it("falls back to a replacement-level QB without a backup", () => {
+      const noBackup: TeamAbsence = { ...absence, expectedQb: { starter: "00-0000001", backup: null, starterOut: 1, skill: -0.2 } };
+      expect(expectedQb(noBackup, names)?.name).toBe("Replacement-level QB");
+    });
+
+    it("is absent without QB information", () => {
+      expect(expectedQb(undefined, names)).toBeUndefined();
+    });
+  });
+
   describe("listAbsences", () => {
     it("keeps likely-absent regulars, most important first, with names", () => {
       expect(listAbsences(absence, inputs.names).map((a) => [a.name, a.reason])).toEqual([["Brock Purdy", "out"]]);

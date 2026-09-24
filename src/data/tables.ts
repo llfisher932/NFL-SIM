@@ -3,6 +3,7 @@ import type { DatasetId } from "../types/data";
 import {
   injuryReportRowSchema,
   pbpRowSchema,
+  contractRowSchema,
   playerRowSchema,
   playerWeeklyStatsRowSchema,
   scheduleRowSchema,
@@ -60,6 +61,13 @@ export const TABLE_SPECS: readonly TableSpec[] = [
     dataset: "players",
     schema: playerRowSchema,
     keySql: "coalesce(gsis_id, display_name)",
+    seasonal: false,
+  },
+  {
+    table: "contracts",
+    dataset: "contracts",
+    schema: contractRowSchema,
+    keySql: "concat_ws(':', coalesce(gsis_id, player), year_signed, coalesce(team, '?'))",
     seasonal: false,
   },
 ];

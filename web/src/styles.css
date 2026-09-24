@@ -249,6 +249,21 @@ main {
   font-weight: 650;
 }
 
+.page-head h2 {
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  margin: 0;
+  font-weight: 650;
+}
+
+.tracker {
+  margin: 22px 0 28px;
+}
+
+.tracker .chart-card td .muted {
+  font-size: 12px;
+}
+
 .page-meta {
   color: var(--muted);
   font-size: 13px;

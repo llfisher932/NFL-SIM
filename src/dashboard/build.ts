@@ -1,3 +1,4 @@
+import type { TrackerReport } from "../types/tracker";
 import { devigHomeWinProbability } from "../eval/market";
 import { calibrationReport, compareToMarket } from "../eval/report";
 import type { BacktestPrediction } from "../types/eval";
@@ -41,6 +42,18 @@ export function listAbsences(absence: TeamAbsence | undefined, names: ReadonlyMa
     .map((m) => ({ ...m, name: names.get(m.playerId) ?? m.playerId }));
 }
 
+export function expectedQb(absence: TeamAbsence | undefined, names: ReadonlyMap<string, string>): DashboardTeam["qb"] {
+  const qb = absence?.expectedQb;
+  if (!qb) return undefined;
+  const name = (id: string | null) => (id ? (names.get(id) ?? id) : "Replacement-level QB");
+  const starterSits = qb.starterOut >= 0.5;
+  return {
+    name: starterSits ? name(qb.backup) : name(qb.starter),
+    skill: qb.skill,
+    starterOut: starterSits && qb.starter ? name(qb.starter) : null,
+  };
+}
+
 function team(
   side: "home" | "away",
   inputs: GameInputs,
@@ -55,6 +68,7 @@ function team(
     offense: rating.offense.all,
     defense: rating.defense.all,
     injuryShift: netRating(rating) - netRating(inputs.baseline[side]),
+    qb: expectedQb(inputs.absences[side], inputs.names),
     out: listAbsences(inputs.absences[side], inputs.names),
   };
 }
@@ -152,11 +166,16 @@ export function mergeIndex(existing: DashboardIndex | null, entries: readonly Da
   };
 }
 
-export function buildRecord(predictions: readonly BacktestPrediction[], generatedAt: string): DashboardRecord {
+export function buildRecord(
+  predictions: readonly BacktestPrediction[],
+  generatedAt: string,
+  tracker?: TrackerReport,
+): DashboardRecord {
   return {
     generatedAt,
     games: predictions.length,
     seasons: compareToMarket(predictions),
     calibration: calibrationReport(predictions),
+    tracker,
   };
 }

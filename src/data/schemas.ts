@@ -202,6 +202,14 @@ export const weeklyRosterRowSchema = z.object({
   status: text("status"),
 });
 
+export const contractRowSchema = z.object({
+  player: text("player"),
+  position: text("position"),
+  gsis_id: matching("gsis_id", GSIS_ID).nullable(),
+  year_signed: int("year_signed", 1990, 2100),
+  apy_cap_pct: num("apy_cap_pct", 0, 1),
+});
+
 export const playerRowSchema = z.object({
   gsis_id: matching("gsis_id", GSIS_ID),
   display_name: text("display_name"),

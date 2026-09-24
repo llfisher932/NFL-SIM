@@ -125,7 +125,7 @@ export async function loadConversionCounts(connection: DuckDBConnection): Promis
 }
 
 const GAME_COLUMNS = `game_id, season, week, game_type, gameday, gametime, home_team, away_team, location,
-  spread_line, total_line, home_moneyline, away_moneyline, home_score, away_score`;
+  spread_line, total_line, home_moneyline, away_moneyline, home_score, away_score, home_qb_id, away_qb_id, home_rest, away_rest`;
 
 async function loadGames(
   connection: DuckDBConnection,
@@ -151,6 +151,10 @@ async function loadGames(
     homeMoneyline: nullableNumber(row["home_moneyline"]),
     awayMoneyline: nullableNumber(row["away_moneyline"]),
     homeScore: nullableNumber(row["home_score"]),
+    homeQb: row["home_qb_id"] == null ? null : String(row["home_qb_id"]),
+    awayQb: row["away_qb_id"] == null ? null : String(row["away_qb_id"]),
+    homeRest: nullableNumber(row["home_rest"]),
+    awayRest: nullableNumber(row["away_rest"]),
     awayScore: nullableNumber(row["away_score"]),
   }));
 }

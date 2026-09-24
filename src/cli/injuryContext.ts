@@ -1,7 +1,8 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
-import { loadAvailability, loadPlayerSnaps, loadQbDropbacks } from "../data/availability";
+import { loadAvailability, loadContracts, loadPlayerSnaps, loadQbDropbacks, loadQbProfiles } from "../data/availability";
 import type { InjuryInputs } from "../eval/backtest";
 import { DEFAULT_INJURY_CONFIG } from "../features/injuries";
+import { DEFAULT_TALENT_CONFIG, createTalentModel } from "../features/talent";
 import type { TeamAbsence } from "../types/injuries";
 import type { PlayerOverride } from "../types/players";
 
@@ -11,9 +12,12 @@ export async function loadInjuryInputs(
   manual: readonly PlayerOverride[] = [],
 ): Promise<InjuryInputs | undefined> {
   if (!enabled) return undefined;
+  const snaps = await loadPlayerSnaps(connection);
   return {
-    snaps: await loadPlayerSnaps(connection),
+    snaps,
+    talent: createTalentModel(await loadContracts(connection), snaps, DEFAULT_TALENT_CONFIG),
     qbDropbacks: await loadQbDropbacks(connection),
+    qbProfiles: await loadQbProfiles(connection),
     availability: { ...(await loadAvailability(connection)), manualOuts: manualOuts(manual) },
     config: DEFAULT_INJURY_CONFIG,
   };

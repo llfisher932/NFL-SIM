@@ -1,3 +1,4 @@
+import type { TrackerReport } from "./tracker";
 import type { CalibrationReport } from "../eval/report";
 import type { SeasonComparison } from "./eval";
 import type { AbsenceReason, PositionGroup } from "./injuries";
@@ -20,6 +21,8 @@ export interface DashboardTeam {
   offense: number;
   defense: number;
   injuryShift: number;
+  // Most likely starting QB and his expected EPA/dropback relative to league average.
+  qb?: { name: string; skill: number; starterOut: string | null } | undefined;
   out: DashboardAbsence[];
 }
 
@@ -88,4 +91,6 @@ export interface DashboardRecord {
   games: number;
   seasons: SeasonComparison[];
   calibration: CalibrationReport;
+  // Picks logged before kickoff this season, graded as games finish.
+  tracker?: TrackerReport | undefined;
 }

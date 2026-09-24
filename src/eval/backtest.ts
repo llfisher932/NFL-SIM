@@ -12,13 +12,15 @@ import { projectGame } from "../sim/monteCarlo";
 import { hashSeed } from "../sim/rng";
 import type { BacktestPrediction } from "../types/eval";
 import type { FeatureConfig, SeasonWeek, TeamGame } from "../types/features";
-import type { Availability, InjuryConfig, PlayerSnap, QbDropbacks, TeamAbsence } from "../types/injuries";
+import type { Availability, InjuryConfig, PlayerSnap, QbDropbacks, QbProfile, TeamAbsence } from "../types/injuries";
 import type { ConversionCount, DriveRecord, SimConfig, WeekGame } from "../types/sim";
 import { devigHomeWinProbability } from "./market";
 
 export interface InjuryInputs {
   snaps: readonly PlayerSnap[];
   qbDropbacks: readonly QbDropbacks[];
+  qbProfiles?: ReadonlyMap<string, QbProfile>;
+  talent?: (playerId: string, season: number) => number;
   availability: Availability;
   config: InjuryConfig;
 }

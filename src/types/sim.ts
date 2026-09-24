@@ -80,10 +80,19 @@ export interface WeekGame extends SeasonWeek {
   awayMoneyline: number | null;
   homeScore: number | null;
   awayScore: number | null;
+  // Listed starting QBs: the actual starter once played, the projected one before.
+  homeQb?: string | null;
+  awayQb?: string | null;
+  // Days since each team's previous game.
+  homeRest?: number | null;
+  awayRest?: number | null;
 }
 
 export interface SimConfig {
   homeFieldEpa: number;
+  // Home edge per day of rest advantage, capped at restCapDays either way.
+  restEpaPerDay: number;
+  restCapDays: number;
   priorTrainingSeasons: number;
   minTrainingDrives: number;
   neighbors: number;
@@ -105,6 +114,8 @@ export interface Matchup {
   neutralSite: boolean;
   postseason: boolean;
   leaguePlaysPerGame: number;
+  // Home rest days minus away rest days.
+  restDiff?: number;
 }
 
 export interface GameResult {

@@ -16,7 +16,8 @@ export type DatasetId =
   | "injury_reports"
   | "snap_counts"
   | "weekly_rosters"
-  | "players";
+  | "players"
+  | "contracts";
 
 export interface RawFile {
   dataset: DatasetId;

@@ -3,6 +3,7 @@ import type { HitRate, ScoreCard } from "../../../src/types/eval";
 import { fixed, generatedLabel, pct } from "../lib/format";
 import { CalibrationChart } from "./CalibrationChart";
 import { ChartFrame } from "./ChartFrame";
+import { TrackerSection } from "./TrackerSection";
 
 const hitRate = (h: HitRate) => (h.decisions === 0 ? "—" : pct(h.hits / h.decisions, 1));
 
@@ -50,6 +51,8 @@ export function RecordView({ record }: { record: DashboardRecord }) {
           <div className="tile-sub muted">Over/under {hitRate(all.overUnder)}</div>
         </div>
       </div>
+
+      {record.tracker && <TrackerSection tracker={record.tracker} />}
 
       <div className="two-col">
         <ChartFrame

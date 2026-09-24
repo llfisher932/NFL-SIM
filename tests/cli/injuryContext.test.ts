@@ -37,7 +37,7 @@ describe("cli/injuryContext", () => {
       team: "BUF",
       offense: { QB: 1, RB: 0, WR: 0, TE: 0, OL: 0 },
       defense: { DL: 0, LB: 0, DB: 0 },
-      qbValue: 0,
+      qbDelta: 0,
       missing: [
         { playerId: "00-0000002", group: "OL", role: 0.9, probability: 1, reason: "inactive" },
         { playerId: "00-0000001", group: "QB", role: 1, probability: 1, reason: "out" },

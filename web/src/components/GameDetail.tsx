@@ -59,6 +59,12 @@ function InjuryCard({ team, side }: { team: DashboardTeam; side: "away" | "home"
             Net rating effect vs a typical week: <strong>{signed(team.injuryShift, 3)}</strong> EPA/play
             {team.injuryShift >= 0 ? " (healthier than usual, or absences already priced in)" : " (weaker than its rating)"}
           </p>
+          {team.qb && (
+            <p>
+              Expected QB: <strong>{team.qb.name}</strong> ({signed(team.qb.skill, 2)} EPA/dropback vs league average)
+              {team.qb.starterOut ? ` · in for ${team.qb.starterOut}` : ""}
+            </p>
+          )}
         </div>
       </div>
       {team.out.length === 0 ? (

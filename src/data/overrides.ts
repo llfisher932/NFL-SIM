@@ -11,6 +11,7 @@ export const overrideSchema = z
   .object({
     season: z.int({ error: "invalid season" }).min(1999, "invalid season").max(2100, "invalid season"),
     week: z.int({ error: "invalid week" }).min(1, "invalid week").max(22, "invalid week"),
+    throughWeek: z.int({ error: "invalid throughWeek" }).min(1, "invalid throughWeek").max(22, "invalid throughWeek").optional(),
     playerId: z.string({ error: "missing playerId" }).regex(/^00-\d{7}$/, "invalid playerId"),
     status: z.literal("out", { error: "invalid status" }).optional(),
     targetShare: share("targetShare").optional(),
@@ -22,7 +23,8 @@ export const overrideSchema = z
   })
   .strict()
   .refine((o) => o.status !== undefined || o.targetShare !== undefined || o.carryShare !== undefined, "override does nothing")
-  .refine((o) => o.status === undefined || (o.targetShare === undefined && o.carryShare === undefined), "out player with shares");
+  .refine((o) => o.status === undefined || (o.targetShare === undefined && o.carryShare === undefined), "out player with shares")
+  .refine((o) => o.throughWeek === undefined || o.throughWeek >= o.week, "throughWeek before week");
 
 export const overridesFileSchema = z.array(overrideSchema, { error: "overrides must be a list" });
 
@@ -32,7 +34,9 @@ export function parseOverrides(json: unknown): PlayerOverride[] {
     const issue = result.error.issues[0]!;
     throw new Error(`overrides: ${issue.path.length > 0 ? `[${issue.path.join(".")}] ` : ""}${issue.message}`);
   }
-  return result.data;
+  return result.data.flatMap(({ throughWeek, ...override }) =>
+    Array.from({ length: (throughWeek ?? override.week) - override.week + 1 }, (_, i) => ({ ...override, week: override.week + i })),
+  );
 }
 
 export async function loadOverrides(path: string): Promise<PlayerOverride[]> {

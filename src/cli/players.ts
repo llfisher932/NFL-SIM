@@ -75,7 +75,7 @@ async function main(): Promise<void> {
     );
     if (games.length === 0) throw new Error(`no games for ${target.season} week ${target.week}`);
     const allGames = await loadSeasonGames(db.connection, Array.from({ length: target.season - 2020 }, (_, i) => 2021 + i));
-    const injuryInputs = await loadInjuryInputs(db.connection, !values["no-injuries"]);
+    const injuryInputs = await loadInjuryInputs(db.connection, !values["no-injuries"], overrides);
 
     const weekFeatures = createWeekFeatureCache(createFeatureModel(teamGames, DEFAULT_FEATURE_CONFIG), teamsBySeason(teamGames, allGames));
     const model = fitDriveModel(drives, conversions, target, ratingLookupFrom(weekFeatures), DEFAULT_SIM_CONFIG);

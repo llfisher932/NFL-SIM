@@ -18,6 +18,7 @@ const REASON_LABELS: Record<string, string> = {
   reserve: "Injured reserve",
   "not active": "Off active roster",
   "not on roster": "No longer on roster",
+  "ruled out": "Ruled out",
 };
 
 const SIDE_COLOR = { away: "var(--away)", home: "var(--home)" } as const;

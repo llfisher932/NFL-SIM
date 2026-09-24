@@ -58,7 +58,7 @@ export async function exportWeeks(options: ExportOptions): Promise<void> {
           db.connection,
           Array.from({ length: season - FIRST_DATA_SEASON + 1 }, (_, i) => FIRST_DATA_SEASON + i),
         ),
-        injuries: await loadInjuryInputs(db.connection, options.injuries),
+        injuries: await loadInjuryInputs(db.connection, options.injuries, manualOverrides),
         names: await loadPlayerNames(db.connection),
         backtest: await loadBacktestPredictions(db.connection),
       };

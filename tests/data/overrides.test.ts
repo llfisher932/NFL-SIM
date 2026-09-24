@@ -12,6 +12,19 @@ describe("data/overrides", () => {
       expect(parseOverrides([{ ...base, status: "out", note: "hamstring" }])).toEqual([{ ...base, status: "out", note: "hamstring" }]);
     });
 
+    it("expands throughWeek into one override per week", () => {
+      const parsed = parseOverrides([{ ...base, week: 3, throughWeek: 5, status: "out" }]);
+      expect(parsed.map((o) => o.week)).toEqual([3, 4, 5]);
+    });
+
+    it("drops throughWeek from the expanded overrides", () => {
+      expect(parseOverrides([{ ...base, week: 3, throughWeek: 3, status: "out" }])[0]).not.toHaveProperty("throughWeek");
+    });
+
+    it("rejects a throughWeek before the week", () => {
+      expect(() => parseOverrides([{ ...base, week: 5, throughWeek: 4, status: "out" }])).toThrow("throughWeek before week");
+    });
+
     it("accepts share overrides", () => {
       expect(parseOverrides([{ ...base, targetShare: 0.3, carryShare: 0 }])).toHaveLength(1);
     });

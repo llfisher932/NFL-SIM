@@ -286,11 +286,12 @@ export function createInjuryModel(inputs: InjuryModelInputs): InjuryModel {
     const missing: TeamAbsence["missing"] = [];
     for (const r of roles) {
       const report = reports.get(`${cacheKey}:${r.playerId}`);
-      const probability = absenceProbability(report, rosterPublished, gameday, config.absence);
+      const manual = inputs.availability.manualOuts?.has(`${target.season}:${target.week}:${r.playerId}`) ?? false;
+      const probability = manual ? 1 : absenceProbability(report, rosterPublished, gameday, config.absence);
       if (probability > 0) {
         add(r.group, r.role * probability);
         qbValue += r.role * probability * (qbValues.get(r.playerId) ?? 0);
-        missing.push({ ...r, probability, reason: absenceReason(report, rosterPublished) });
+        missing.push({ ...r, probability, reason: manual ? "ruled out" : absenceReason(report, rosterPublished) });
       }
     }
 

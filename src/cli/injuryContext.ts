@@ -5,14 +5,22 @@ import { DEFAULT_INJURY_CONFIG } from "../features/injuries";
 import type { TeamAbsence } from "../types/injuries";
 import type { PlayerOverride } from "../types/players";
 
-export async function loadInjuryInputs(connection: DuckDBConnection, enabled: boolean): Promise<InjuryInputs | undefined> {
+export async function loadInjuryInputs(
+  connection: DuckDBConnection,
+  enabled: boolean,
+  manual: readonly PlayerOverride[] = [],
+): Promise<InjuryInputs | undefined> {
   if (!enabled) return undefined;
   return {
     snaps: await loadPlayerSnaps(connection),
     qbDropbacks: await loadQbDropbacks(connection),
-    availability: await loadAvailability(connection),
+    availability: { ...(await loadAvailability(connection)), manualOuts: manualOuts(manual) },
     config: DEFAULT_INJURY_CONFIG,
   };
+}
+
+export function manualOuts(overrides: readonly PlayerOverride[]): Set<string> {
+  return new Set(overrides.filter((o) => o.status === "out").map((o) => `${o.season}:${o.week}:${o.playerId}`));
 }
 
 // Manual overrides win over automatic injury outs for the same player and week.

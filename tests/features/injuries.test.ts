@@ -258,11 +258,12 @@ describe("features/injuries", () => {
       snaps = baseSnaps,
       published: string[] = [],
       qbs = qbDropbacks,
+      manual: string[] = [],
     ): ReturnType<typeof createInjuryModel> {
       const inputs: InjuryModelInputs = {
         snaps,
         qbDropbacks: qbs,
-        availability: { reports, rosterTeamWeeks: new Set(published) },
+        availability: { reports, rosterTeamWeeks: new Set(published), manualOuts: new Set(manual) },
         teamGames,
         games,
         weekFeatures,
@@ -277,6 +278,20 @@ describe("features/injuries", () => {
       const absence = build([report({ playerId: "00-000000Q", injuryStatus: "Out" })]).absenceAt("BUF", week5);
       expect(absence.offense.QB).toBeCloseTo(1, 9);
       expect(absence.missing.map((m) => m.playerId)).toEqual(["00-000000Q"]);
+    });
+
+    it("counts a QB ruled out by hand as missing even when the report lists him healthy", () => {
+      const absence = build([], baseSnaps, [], qbDropbacks, ["2024:5:00-000000Q"]).absenceAt("BUF", week5);
+      expect(absence.offense.QB).toBeCloseTo(1, 9);
+    });
+
+    it("labels a manual out as ruled out", () => {
+      const absence = build([], baseSnaps, [], qbDropbacks, ["2024:5:00-000000Q"]).absenceAt("BUF", week5);
+      expect(absence.missing.map((m) => m.reason)).toEqual(["ruled out"]);
+    });
+
+    it("applies a manual out only to its week", () => {
+      expect(build([], baseSnaps, [], qbDropbacks, ["2024:6:00-000000Q"]).absenceAt("BUF", week5).missing).toEqual([]);
     });
 
     it("values a missing QB by his EPA per dropback above replacement", () => {

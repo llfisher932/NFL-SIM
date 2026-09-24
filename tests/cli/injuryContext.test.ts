@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { describeAbsence, mergeOverrides } from "../../src/cli/injuryContext";
+import { describeAbsence, manualOuts, mergeOverrides } from "../../src/cli/injuryContext";
 import type { TeamAbsence } from "../../src/types/injuries";
 
 describe("cli/injuryContext", () => {
+  describe("manualOuts", () => {
+    it("keys out players by season, week and player", () => {
+      const overrides = [
+        { season: 2026, week: 3, playerId: "00-0040691", status: "out" as const },
+        { season: 2026, week: 3, playerId: "00-0000002", targetShare: 0.2 },
+      ];
+      expect([...manualOuts(overrides)]).toEqual(["2026:3:00-0040691"]);
+    });
+  });
+
   describe("mergeOverrides", () => {
     const manual = [{ season: 2025, week: 5, playerId: "00-0000001", targetShare: 0.2 }];
     const automatic = [

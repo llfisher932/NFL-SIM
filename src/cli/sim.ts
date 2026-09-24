@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import { DEFAULT_DB_PATH, openDatabase } from "../data/db";
+import { DEFAULT_OVERRIDES_PATH, loadOverrides } from "../data/overrides";
 import { loadConversionCounts, loadDrives, loadSeasonGames, loadWeekGames } from "../data/drives";
 import { loadPlayerNames } from "../data/availability";
 import { loadTeamGames } from "../data/teamGames";
@@ -23,6 +24,7 @@ const { values } = parseArgs({
     seed: { type: "string", default: String(DEFAULT_SEED) },
     "hfa-epa": { type: "string", default: String(DEFAULT_SIM_CONFIG.homeFieldEpa) },
     "no-injuries": { type: "boolean", default: false },
+    overrides: { type: "string", default: DEFAULT_OVERRIDES_PATH },
     db: { type: "string", default: DEFAULT_DB_PATH },
   },
 });
@@ -36,6 +38,7 @@ async function main(): Promise<void> {
   const seed = parseSeed(values.seed);
   const config = { ...DEFAULT_SIM_CONFIG, homeFieldEpa: parseHfa(values["hfa-epa"]) };
 
+  const overrides = await loadOverrides(values.overrides);
   const db = await openDatabase(values.db);
   const [teamGames, drives, conversions, games, allGames, injuryInputs, names] = await (async () => {
     try {
@@ -45,7 +48,7 @@ async function main(): Promise<void> {
         await loadConversionCounts(db.connection),
         await loadWeekGames(db.connection, target.season, target.week),
         await loadSeasonGames(db.connection, Array.from({ length: target.season - 2020 }, (_, i) => 2021 + i)),
-        await loadInjuryInputs(db.connection, !values["no-injuries"]),
+        await loadInjuryInputs(db.connection, !values["no-injuries"], overrides),
         await loadPlayerNames(db.connection),
       ] as const;
     } finally {

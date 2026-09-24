@@ -30,6 +30,8 @@ export interface AvailabilityReport extends SeasonWeek {
 export interface Availability {
   reports: readonly AvailabilityReport[];
   rosterTeamWeeks: ReadonlySet<string>;
+  // Players ruled out by hand, keyed season:week:playerId.
+  manualOuts?: ReadonlySet<string>;
 }
 
 export interface PlayerRole {
@@ -38,7 +40,7 @@ export interface PlayerRole {
   role: number;
 }
 
-export type AbsenceReason = "out" | "doubtful" | "questionable" | "inactive" | "reserve" | "not active" | "not on roster";
+export type AbsenceReason = "out" | "doubtful" | "questionable" | "inactive" | "reserve" | "not active" | "not on roster" | "ruled out";
 
 export interface MissingPlayer {
   playerId: string;

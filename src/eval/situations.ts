@@ -14,9 +14,18 @@ export interface Situation {
   applies(input: SituationInput): boolean;
 }
 
-// Candidate situations, first picked from the 2022-2025 backtest. Earlier seasons are an
-// out-of-sample check, and a situation is only flagged once it beats break-even across them.
+// Candidate situations. A situation is only flagged once it beats break-even across the whole
+// backtest and in most seasons. The last four were picked from 2022-2025 and failed on 2015-2021;
+// they stay listed so their record remains visible. "disagree-5" came from a fixed list of 33 rules
+// found on 2015-2021 and confirmed on 2022-2025, the only one to pass both.
 export const SITUATIONS: readonly Situation[] = [
+  {
+    id: "disagree-5",
+    label: "5+ point disagreement",
+    market: "spread",
+    description: "The model's margin is 5+ points away from the spread",
+    applies: (g) => g.spreadLine !== null && Math.abs(g.modelMargin - g.spreadLine) >= 5,
+  },
   {
     id: "playoffs",
     label: "Playoff game",

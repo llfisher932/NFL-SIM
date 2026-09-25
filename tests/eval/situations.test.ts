@@ -48,6 +48,11 @@ describe("eval/situations", () => {
       expect(situation("playoffs").applies(input())).toBe(false);
     });
 
+    it("flags a disagreement of 5 or more points with the spread", () => {
+      expect(situation("disagree-5").applies(input({ modelMargin: 8 }))).toBe(true);
+      expect(situation("disagree-5").applies(input({ modelMargin: 7.9 }))).toBe(false);
+    });
+
     it("flags a disagreement of 3 or more points with the spread", () => {
       expect(situation("disagree-3").applies(input({ modelMargin: 6 }))).toBe(true);
       expect(situation("disagree-3").applies(input({ modelMargin: 5.9 }))).toBe(false);

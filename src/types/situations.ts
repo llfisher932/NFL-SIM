@@ -1,6 +1,6 @@
 import type { PickResult } from "./tracker";
 
-export type SituationId = "playoffs" | "disagree-3" | "big-spread" | "early-total";
+export type SituationId = "disagree-5" | "playoffs" | "disagree-3" | "big-spread" | "early-total";
 export type Market = "spread" | "total";
 
 // What a situation rule needs to know about one game, before kickoff.
